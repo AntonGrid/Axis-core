@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from pathlib import Path
 import json
 import secrets
@@ -8,8 +8,13 @@ from datetime import datetime, timezone
 
 from jsonschema import Draft7Validator, ValidationError
 
+from app.api import oracle  # Oracle router
+
 
 app = FastAPI(title="ENRG Part II Mock with JSON Schema")
+
+# Подключаем Oracle-роуты
+app.include_router(oracle.router)
 
 # --- JSON Schema loading and validators ---
 
@@ -152,7 +157,7 @@ def provisioning_attest(body: DeviceProofRequest) -> Dict[str, Any]:
     """
     Device attestation endpoint (mock):
     - validates DeviceProof payload against JSON Schema
-    - in реальном мире: передаём в Policy Engine, получаем решение и пр.
+    - в реальном мире: передаём в Policy Engine, получаем решение и пр.
     """
 
     proof_dict = {
