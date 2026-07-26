@@ -1,6 +1,3 @@
-from datetime import datetime, timezone
-
-import json
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -8,18 +5,11 @@ from app.main import app
 client = TestClient(app)
 
 
-def _now_utc_no_microseconds() -> datetime:
-    return datetime.now(timezone.utc).replace(microsecond=0)
-
-
-def test_attest_happy_path():
-    now = _now_utc_no_microseconds()
-    proof_timestamp = now.isoformat().replace("+00:00", "Z")
-
+def test_oracle_attest_request_ok():
     payload = {
         "device_id": "dev_9e9c644e1580a83b",
         "nonce": "abc12345xyz",
-        "timestamp": proof_timestamp,
+        "timestamp": "2026-07-25T19:05:00Z",
         "algo": "mock",
         "payload": {"max_power_kw": 2.5},
         "signature": "deadbeef" * 8,
@@ -28,40 +18,42 @@ def test_attest_happy_path():
     resp = client.post("/oracle/attest", json=payload)
     assert resp.status_code == 200
 
-    data = resp.json()
-    assert data["device_id"] == payload["device_id"]
-    assert "attestation_id" in data
-    assert "decision" in data
-    assert data["decision"]["allowed"] is True
-    assert data["decision"]["max_power_kw"] == 2.5
+    body = resp.json()
+    assert body["device_id"] == payload["device_id"]
+    assert "attestation_id" in body
+
+    decision = body["decision"]
+    assert decision["allowed"] is True
+    assert decision["max_power_kw"] == 2.5
+    assert decision["reason"] == "ok"
 
 
-def test_attest_schema_validation_error_missing_required():
-    now = _now_utc_no_microseconds()
-    proof_timestamp = now.isoformat().replace("+00:00", "Z")
-
-    # Нет поля "signature"
+def test_oracle_attest_request_invalid_schema():
+    # Отсутствует обязательное поле signature
     payload = {
         "device_id": "dev_9e9c644e1580a83b",
         "nonce": "abc12345xyz",
-        "timestamp": proof_timestamp,
+        "timestamp": "2026-07-25T19:05:00Z",
         "algo": "mock",
         "payload": {"max_power_kw": 2.5},
+        # "signature": "deadbeef" * 8,
     }
 
     resp = client.post("/oracle/attest", json=payload)
     assert resp.status_code == 400
-    data = resp.json()
-    assert data["detail"]["error"] == "schema_validation_error"
-    assert "signature" in json.dumps(data["detail"]["message"])
+
+    body = resp.json()
+    assert body["detail"]["error"] == "schema_validation_error"
+    # Сообщение из jsonschema может меняться, поэтому проверяем ключевую подстроку
+    assert "required property" in body["detail"]["message"]
 
 
-def test_attest_schema_validation_error_invalid_timestamp():
-    # Некорректный формат timestamp
+def test_oracle_attest_request_invalid_timestamp():
     payload = {
         "device_id": "dev_9e9c644e1580a83b",
         "nonce": "abc12345xyz",
-        "timestamp": "invalid-timestamp",
+        # Неверный формат: нет 'Z' на конце
+        "timestamp": "2026-07-25T19:05:00",
         "algo": "mock",
         "payload": {"max_power_kw": 2.5},
         "signature": "deadbeef" * 8,
@@ -69,6 +61,28 @@ def test_attest_schema_validation_error_invalid_timestamp():
 
     resp = client.post("/oracle/attest", json=payload)
     assert resp.status_code == 400
-    data = resp.json()
-    assert data["detail"]["error"] == "schema_validation_error"
-    assert "timestamp" in json.dumps(data["detail"]["message"])
+
+    body = resp.json()
+    assert body["detail"]["error"] == "schema_validation_error"
+    assert body["detail"]["message"] == "timestamp is not a valid ISO 8601 string with 'Z'"
+
+
+def test_oracle_attest_denied_when_power_too_high():
+    payload = {
+        "device_id": "dev_high_power",
+        "nonce": "nonce_high",
+        "timestamp": "2026-07-25T19:05:00Z",
+        "algo": "mock",
+        "payload": {"max_power_kw": 10.0},
+        "signature": "deadbeef" * 8,
+    }
+
+    resp = client.post("/oracle/attest", json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+
+    decision = body["decision"]
+    assert decision["allowed"] is False
+    assert decision["reason"] == "max_power_exceeded"
+    assert decision["max_power_kw"] == 10.0
+    assert decision["limit_kw"] == 5.0

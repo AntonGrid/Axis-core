@@ -125,10 +125,23 @@ def _handle_new_attest_request(payload: dict) -> Dict[str, Any]:
     max_power_kw = inner_payload.get("max_power_kw") if isinstance(inner_payload, dict) else None
 
     attestation_id = str(uuid4())
-    decision = {
-        "allowed": True,
-        "max_power_kw": max_power_kw,
-    }
+
+    # Простейшее правило: ограничиваем мощность 5 кВт
+    limit_kw = 5.0
+    if max_power_kw is not None and max_power_kw > limit_kw:
+        decision = {
+            "allowed": False,
+            "reason": "max_power_exceeded",
+            "max_power_kw": max_power_kw,
+            "limit_kw": limit_kw,
+        }
+    else:
+        decision = {
+            "allowed": True,
+            "reason": "ok",
+            "max_power_kw": max_power_kw,
+        }
+
     result = {
         "device_id": payload["device_id"],
         "attestation_id": attestation_id,
