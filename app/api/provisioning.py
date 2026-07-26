@@ -1,9 +1,16 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import Dict, Any
 
-from app.services.provisioning_service import register_device
+from jsonschema import ValidationError
+
+from app.services.provisioning_service import register_device, _DB
+from app.schema_utils import get_validator
+
 
 router = APIRouter()
+
+DEVICE_PROOF_VALIDATOR = get_validator("device_proof")
 
 
 class ProvisioningRequest(BaseModel):
@@ -25,3 +32,43 @@ async def provisioning_register(req: ProvisioningRequest):
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/attest")
+async def provisioning_attest(proof: Dict[str, Any]):
+    """
+    Принимает DeviceProof, валидирует по JSON Schema и возвращает простое решение.
+    """
+    try:
+        DEVICE_PROOF_VALIDATOR.validate(proof)
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Invalid DeviceProof",
+                "error": e.message,
+                "path": list(e.path),
+            },
+        )
+
+    device_id = proof.get("device_id")
+    if device_id not in _DB:
+        # Специальный случай: устройство не зарегистрировано
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Invalid DeviceProof",
+                "path": ["device_id"],
+            },
+        )
+
+    decision = {
+        "allowed": True,
+        "reason": "mock-allowed",
+    }
+
+    return {
+        "status": "ok",
+        "device_id": device_id,
+        "decision": decision,
+    }
