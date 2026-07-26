@@ -1,0 +1,156 @@
+openapi: 3.0.3
+info:
+  title: ENRG APIs
+  version: 0.1.1
+
+servers:
+  - url: https://api.enrg.local
+
+paths:
+  /provisioning/start:
+    post:
+      summary: Start provisioning flow
+      operationId: startProvisioning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceProof'
+      responses:
+        '200':
+          description: Provisioning started
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  challenge:
+                    type: string
+                    description: "Случайный challenge в base64"
+                    pattern: "^[A-Za-z0-9+/]{16,}[=]{0,2}$"
+                  device_id:
+                    type: string
+                    pattern: "^enrg:device:[1-9A-HJ-NP-Za-km-z]{32,64}$"
+        '400':
+          description: Invalid request
+
+  /provisioning/complete:
+    post:
+      summary: Complete provisioning flow
+      operationId: completeProvisioning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceProof'
+      responses:
+        '200':
+          description: Provisioning completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRecord'
+        '400':
+          description: Invalid request
+
+  /devices:
+    get:
+      summary: List devices
+      operationId: listDevices
+      responses:
+        '200':
+          description: List of devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceRecord'
+
+  /devices/{id}:
+    get:
+      summary: Get device by ID
+      operationId: getDevice
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^enrg:device:[1-9A-HJ-NP-Za-km-z]{32,64}$"
+      responses:
+        '200':
+          description: Device record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRecord'
+        '404':
+          description: Device not found
+
+    patch:
+      summary: Update device state/metadata
+      operationId: updateDevice
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^enrg:device:[1-9A-HJ-NP-Za-km-z]{32,64}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRecord'
+      responses:
+        '200':
+          description: Updated device record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRecord'
+        '404':
+          description: Device not found
+
+  /devices/{id}/state:
+    get:
+      summary: Get device lifecycle/firmware state
+      operationId: getDeviceState
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^enrg:device:[1-9A-HJ-NP-Za-km-z]{32,64}$"
+      responses:
+        '200':
+          description: Device state
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  lifecycle_state:
+                    type: string
+                  firmware_version:
+                    type: string
+                  manifest_ref:
+                    type: string
+        '404':
+          description: Device not found
+
+components:
+  schemas:
+    DeviceManifest:
+      $ref: '../schemas/device-manifest.schema.json'
+    DeviceRecord:
+      $ref: '../schemas/device-record.schema.json'
+    DeviceProof:
+      $ref: '../schemas/device-proof.schema.json'

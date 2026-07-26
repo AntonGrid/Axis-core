@@ -1,0 +1,21 @@
+{
+  "device_id": "5Jt8qLz3Nh2Dk7Wf9Rs1Cv4Bm6Xp8Za2Te5Yu7LoPqEr",
+  "manifest_ref": "7Yh3kLZ9wQp2Df8RNsC4tVx1aBmE6PgH3uK9sXyZAbCd",
+  "owner": "did:example:operator-1234",
+  "public_key": "9fW3hT2qLp8Vs1DxCr7BnE4mUz6YaP9xLk2SjHoQweRt",
+  "key_type": "ed25519",
+  "lifecycle_state": "provisioned",
+  "firmware_version": "1.0.3",
+  "created_at": "2026-07-25T10:16:00Z",
+  "updated_at": "2026-07-25T10:16:00Z",
+  "last_seen_at": "2026-07-25T10:16:00Z",
+  "tags": [
+    "pilot-berlin",
+    "substation-42"
+  ],
+  "metadata": {
+    "installation_site": "Berlin Substation #42",
+    "rack": "R1",
+    "position": "U12"
+  }
+}

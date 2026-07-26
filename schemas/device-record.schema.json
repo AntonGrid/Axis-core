@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://enrg.local/schemas/device-record.schema.json",
+  "title": "DeviceRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "Deterministic device identifier derived from public key and attributes (base58)",
+      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$"
+    },
+    "manifest_ref": {
+      "type": "string",
+      "description": "Reference to DeviceManifest.manifest_id",
+      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Logical owner / operator of the device (e.g. DID, account, org id)",
+      "maxLength": 512
+    },
+    "public_key": {
+      "type": "string",
+      "description": "Device public key, base58 or base64-encoded",
+      "minLength": 32,
+      "maxLength": 256
+    },
+    "key_type": {
+      "type": "string",
+      "enum": [
+        "ed25519"
+      ]
+    },
+    "lifecycle_state": {
+      "type": "string",
+      "enum": [
+        "factory",
+        "provisioning",
+        "provisioned",
+        "active",
+        "suspended",
+        "decommissioned"
+      ]
+    },
+    "firmware_version": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_seen_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 128
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Free-form operator metadata (site, rack, etc.)",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "device_id",
+    "manifest_ref",
+    "public_key",
+    "key_type",
+    "lifecycle_state",
+    "created_at"
+  ]
+}

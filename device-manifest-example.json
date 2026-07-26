@@ -1,0 +1,22 @@
+{
+  "manifest_id": "7Yh3kLZ9wQp2Df8RNsC4tVx1aBmE6PgH3uK9sXyZAbCd",
+  "version": "1.0.0",
+  "manufacturer": "Acme Energy Devices",
+  "model": "ACME-ENRG-001",
+  "hw_revision": "revA",
+  "fw_version": "1.0.3",
+  "public_key": "9fW3hT2qLp8Vs1DxCr7BnE4mUz6YaP9xLk2SjHoQweRt",
+  "key_type": "ed25519",
+  "capabilities": [
+    "metering",
+    "telemetry",
+    "remote_update"
+  ],
+  "created_at": "2026-07-25T10:15:30Z",
+  "updated_at": "2026-07-25T10:15:30Z",
+  "metadata": {
+    "country": "DE",
+    "voltage_range": "220-240V",
+    "communication": ["wifi", "ethernet"]
+  }
+}

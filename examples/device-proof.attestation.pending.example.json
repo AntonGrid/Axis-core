@@ -1,0 +1,27 @@
+{
+  "proof_id": "enrg:proof:9Kxg7rC1pZfNqT4sR2uW",
+  "device_id": "enrg:device:8pzEHpXf3iJx7tRMGQxJ2L1Zk4VgYw3b1aYTWcYo6H3N",
+  "type": "device_state_attestation",
+  "schema_version": "1.0.0",
+  "payload": {
+    "nonce": "tS4p8i0xC3yN5UzfG1k7uQ==",
+    "timestamp": "2026-07-25T09:40:00Z",
+    "firmware_version": "1.2.3",
+    "manifest_ref": "urn:enrg:manifest:basic-sensor-v1",
+    "lifecycle_state": "active",
+    "metrics": {
+      "uptime_sec": 86400,
+      "last_reset_reason": "power_on"
+    }
+  },
+  "signature": {
+    "alg": "Ed25519",
+    "public_key": "ed25519:5Nqzbe2acT7q8cRZB1Xajrmwe3oxtgGZC15fsXLS2gVj",
+    "signature": "XGtiZxQbyWXW0+OHx3E9lLzQ3RIQK7n9a2WG1Yfckv1CQmYxI5XGg0oX3kSJoX4oENX9aRV1xu9+5XDNJg4+Ww=="
+  },
+  "oracle_context": {
+    "oracle_id": "oracle-main-1",
+    "verification_result": "pending",
+    "verified_at": null
+  }
+}

@@ -1,0 +1,216 @@
+openapi: 3.0.3
+info:
+  title: ENRG Provisioning Service API
+  version: 0.1.0
+  description: >
+    Provisioning / onboarding устройств в ENRG.
+    Вся криптография и идентичность — через Ed25519, provisioning строится вокруг challenge/response.
+
+servers:
+  - url: https://provisioning.enrg.example.com
+
+paths:
+  /provisioning/start:
+    post:
+      summary: Начало provisioning-потока (создание provisioning_id и challenge)
+      operationId: startProvisioning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProvisioningStartRequest'
+      responses:
+        '200':
+          description: Provisioning-сессия создана, выдан challenge
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningStartResponse'
+        '400':
+          description: Некорректный запрос (отсутствуют обязательные поля)
+        '409':
+          description: Конфликт (например, устройство с таким serial уже привязано)
+
+  /provisioning/complete:
+    post:
+      summary: Завершение provisioning по подписи устройства
+      operationId: completeProvisioning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProvisioningChallengeResponse'
+      responses:
+        '200':
+          description: Устройство успешно заведено в Device Registry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningCompleteResponse'
+        '400':
+          description: Некорректный запрос
+        '401':
+          description: Подпись/attestation невалидны
+        '410':
+          description: Provisioning-сессия истекла или не найдена
+
+components:
+  schemas:
+    ManufacturerInfo:
+      type: object
+      required: [id, model, serial_number]
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+        serial_number:
+          type: string
+
+    OwnerInfo:
+      type: object
+      required: [type, id]
+      properties:
+        type:
+          type: string
+          enum: [organization, individual]
+        id:
+          type: string
+        onchain_account:
+          type: string
+          nullable: true
+          description: On-chain аккаунт владельца (например, Solana address)
+
+    ProvisioningStartRequest:
+      type: object
+      required:
+        - manufacturer
+        - owner
+        - device_public_key
+        - claimed_manifest_ref
+      properties:
+        manufacturer:
+          $ref: '#/components/schemas/ManufacturerInfo'
+        owner:
+          $ref: '#/components/schemas/OwnerInfo'
+        device_public_key:
+          type: string
+          description: Ed25519 публичный ключ устройства (формат префикс+base58/base64, TBD)
+        claimed_manifest_ref:
+          type: string
+          description: Ссылка на ожидаемый Device Manifest (URN/URL)
+        context:
+          type: object
+          additionalProperties: true
+
+    ProvisioningStartResponse:
+      type: object
+      required:
+        - provisioning_id
+        - challenge
+        - expected_manifest_ref
+      properties:
+        provisioning_id:
+          type: string
+        device_id:
+          type: string
+          nullable: true
+          description: >
+            Может быть null на старте; финальный device_id появится после complete.
+        challenge:
+          type: object
+          required: [nonce, expires_at]
+          properties:
+            nonce:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+        expected_manifest_ref:
+          type: string
+
+    AttestationSignature:
+      type: object
+      required:
+        - alg
+        - public_key
+        - signature
+      properties:
+        alg:
+          type: string
+          enum: [Ed25519]
+        public_key:
+          type: string
+        signature:
+          type: string
+
+    DeviceProvisioningAttestationPayload:
+      type: object
+      required:
+        - nonce
+        - timestamp
+        - firmware_version
+        - manifest_ref
+      properties:
+        nonce:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        firmware_version:
+          type: string
+        manifest_ref:
+          type: string
+
+    DeviceProvisioningAttestation:
+      type: object
+      required:
+        - schema_version
+        - payload
+        - signature
+      properties:
+        schema_version:
+          type: string
+        payload:
+          $ref: '#/components/schemas/DeviceProvisioningAttestationPayload'
+        signature:
+          $ref: '#/components/schemas/AttestationSignature'
+
+    ProvisioningChallengeResponse:
+      type: object
+      required:
+        - provisioning_id
+        - device_public_key
+        - attestation
+      properties:
+        provisioning_id:
+          type: string
+        device_public_key:
+          type: string
+        attestation:
+          $ref: '#/components/schemas/DeviceProvisioningAttestation'
+
+    ProvisioningCompleteResponse:
+      type: object
+      required:
+        - device_id
+        - manifest_ref
+        - bootstrap_policy
+      properties:
+        device_id:
+          type: string
+        manifest_ref:
+          type: string
+        bootstrap_policy:
+          type: object
+          description: >
+            Минимальный набор политик/разрешений, который устройство должно применять на старте.
+            (Формат будет уточняться Policy Engine.)
+          additionalProperties: true
+        provisioning_proof:
+          type: object
+          description: >
+            Canonical ProvisioningProof, который PS/Oracle может публиковать в DR/on-chain.
+          additionalProperties: true

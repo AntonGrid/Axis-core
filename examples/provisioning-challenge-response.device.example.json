@@ -1,0 +1,18 @@
+{
+  "provisioning_id": "enrg:prov:7pWq3DkL9sTxF1cV2mBn",
+  "device_public_key": "ed25519:5Nqzbe2acT7q8cRZB1Xajrmwe3oxtgGZC15fsXLS2gVj",
+  "attestation": {
+    "schema_version": "1.0.0",
+    "payload": {
+      "nonce": "P8pV7dUqT1bZ3nCkR5yLkg==",
+      "timestamp": "2026-07-25T09:30:10Z",
+      "firmware_version": "1.2.3",
+      "manifest_ref": "urn:enrg:manifest:basic-sensor-v1"
+    },
+    "signature": {
+      "alg": "Ed25519",
+      "public_key": "ed25519:5Nqzbe2acT7q8cRZB1Xajrmwe3oxtgGZC15fsXLS2gVj",
+      "signature": "uM3r2lN0zFx8stc4asjzO3zck7ZB5CxxbYGJ3fXjZ2+3IwaT8l5gZ0L1K3C4F6Q2HxA9eX5vN5oE7f7T0Xg8zA=="
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "type": "provisioning",
+  "device_id": "5Jt8qLz3Nh2Dk7Wf9Rs1Cv4Bm6Xp8Za2Te5Yu7LoPqEr",
+  "manifest_ref": "7Yh3kLZ9wQp2Df8RNsC4tVx1aBmE6PgH3uK9sXyZAbCd",
+  "nonce": "9f3a0b1c2d3e4f5098ab76cd34ef12ab",
+  "timestamp": "2026-07-25T10:17:05Z",
+  "payload": {
+    "firmware_version": "1.0.3",
+    "state": "factory_bootstrap",
+    "metrics": {
+      "uptime_seconds": 42
+    },
+    "context": {
+      "provisioning_session_id": "session-abc-123",
+      "challenge": "prov-challenge-001"
+    }
+  },
+  "signature": "MEUCIQD4l9RHwO6RkP6HN4N6G8JvF3b0g8lJ3P1bC3H2W0n2DAIgaA80x2+FQ95pJIfbXq+JqYlI3qJqz7pQ6h/sDYcHVU4=",
+  "signature_algorithm": "ed25519"
+}

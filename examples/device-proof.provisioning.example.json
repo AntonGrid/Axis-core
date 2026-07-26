@@ -1,0 +1,34 @@
+{
+  "proof_id": "enrg:proof:prov-7pWq3DkL9sTxF1cV2mBn",
+  "type": "provisioning",
+  "schema_version": "1.0.0",
+  "device_id": "enrg:device:8pzEHpXf3iJx7tRMGQxJ2L1Zk4VgYw3b1aYTWcYo6H3N",
+  "payload": {
+    "provisioning_id": "enrg:prov:7pWq3DkL9sTxF1cV2mBn",
+    "manufacturer": {
+      "id": "acme-energy",
+      "model": "acme-sensor-100",
+      "serial_number": "ACME100-000042"
+    },
+    "owner": {
+      "type": "organization",
+      "id": "grid-operator-01",
+      "onchain_account": "8gqk4fsA1SyZupcqTebxi7LnBcMT5Xz5ndURJxxB6bX9"
+    },
+    "device_public_key": "ed25519:5Nqzbe2acT7q8cRZB1Xajrmwe3oxtgGZC15fsXLS2gVj",
+    "manifest_ref": "urn:enrg:manifest:basic-sensor-v1",
+    "challenge_nonce": "P8pV7dUqT1bZ3nCkR5yLkg==",
+    "challenge_timestamp": "2026-07-25T09:30:10Z",
+    "firmware_version": "1.2.3"
+  },
+  "device_signature": {
+    "alg": "Ed25519",
+    "public_key": "ed25519:5Nqzbe2acT7q8cRZB1Xajrmwe3oxtgGZC15fsXLS2gVj",
+    "signature": "uM3r2lN0zFx8stc4asjzO3zck7ZB5CxxbYGJ3fXjZ2+3IwaT8l5gZ0L1K3C4F6Q2HxA9eX5vN5oE7f7T0Xg8zA=="
+  },
+  "oracle_context": {
+    "oracle_id": "oracle-main-1",
+    "verification_result": "valid",
+    "verified_at": "2026-07-25T09:30:12Z"
+  }
+}
