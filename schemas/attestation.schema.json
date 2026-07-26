@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://enrg.example.com/schemas/attestation.schema.json",
+  "title": "OracleAttestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attestation_id",
+    "device_id",
+    "proof",
+    "decision",
+    "oracle_id",
+    "issued_at",
+    "oracle_signature"
+  ],
+  "properties": {
+    "attestation_id": {
+      "type": "string",
+      "pattern": "^att_[0-9a-f]{16}$",
+      "description": "Уникальный идентификатор аттестации, генерируемый Oracle",
+      "example": "att_1a2b3c4d5e6f7890"
+    },
+    "device_id": {
+      "type": "string",
+      "pattern": "^dev_[0-9a-f]{16}$",
+      "description": "Идентификатор устройства из Device Registry",
+      "example": "dev_9e9c644e1580a83b"
+    },
+    "proof": {
+      "type": "object",
+      "description": "Изначальный DeviceProof от устройства",
+      "additionalProperties": true
+    },
+    "decision": {
+      "type": "object",
+      "description": "Решение Policy Engine / Oracle по данному пруфу",
+      "additionalProperties": false,
+      "required": ["allowed", "reason"],
+      "properties": {
+        "allowed": {
+          "type": "boolean",
+          "description": "Разрешено ли действие / режим устройству",
+          "example": true
+        },
+        "reason": {
+          "type": "string",
+          "description": "Человекочитаемое объяснение принятого решения",
+          "example": "mock-allowed"
+        },
+        "max_power_kw": {
+          "type": "number",
+          "format": "float",
+          "description": "Максимально разрешённая мощность (опционально)",
+          "example": 2.5
+        }
+      }
+    },
+    "oracle_id": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Идентификатор Oracle / ключа, которым подписана аттестация",
+      "example": "oracle_main_1"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Время выпуска аттестации Oracle'ом",
+      "example": "2026-07-25T19:05:00Z"
+    },
+    "oracle_signature": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Подпись Oracle по (device_id + decision + issued_at + hash(proof))",
+      "example": "cafebabe" 
+    }
+  }
+}
