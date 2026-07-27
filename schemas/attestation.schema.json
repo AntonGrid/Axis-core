@@ -3,6 +3,7 @@
   "title": "OracleAttestation",
   "type": "object",
   "required": [
+    "schema_version",
     "attestation_id",
     "device_id",
     "proof",
@@ -12,6 +13,10 @@
     "oracle_signature"
   ],
   "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
     "attestation_id": {
       "type": "string",
       "minLength": 1

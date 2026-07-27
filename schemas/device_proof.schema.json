@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "schema_version",
     "device_id",
     "nonce",
     "timestamp",
@@ -13,6 +14,10 @@
     "algo"
   ],
   "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
     "device_id": {
       "type": "string",
       "pattern": "^dev_[0-9a-f]{16}$",

@@ -37,6 +37,7 @@ def build_full_attestation_from_oracle_response(resp: dict) -> dict:
     }
 
     full_attestation = {
+        "schema_version": "1.0",  # явно указываем версию схемы
         "attestation_id": attestation_id,
         "device_id": device_id,
         "proof": proof,

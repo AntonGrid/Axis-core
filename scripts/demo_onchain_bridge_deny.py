@@ -11,20 +11,20 @@ from app.onchain_bridge import build_attestation_params  # noqa: E402
 
 
 def main():
-    att_path = BASE_DIR / "attestation-example.json"
+    att_path = BASE_DIR / "attestation-example-deny.json"
 
     if not att_path.exists():
-        raise FileNotFoundError(f"attestation-example.json not found at {att_path}")
+        raise FileNotFoundError(f"attestation-example-deny.json not found at {att_path}")
 
     with att_path.open("r", encoding="utf-8") as f:
         att = json.load(f)
 
-    # Обеспечиваем наличие schema_version для совместимости с новой схемой
+    # На всякий случай обеспечиваем наличие schema_version
     att.setdefault("schema_version", "1.0")
 
     params = build_attestation_params(att)
 
-    print("=== On-chain parameters for submitAttestation ===")
+    print("=== On-chain parameters for submitAttestation (DENY example) ===")
     print(f"attestationId (bytes32): 0x{params.attestation_id.hex()}")
     print(f"deviceId      (bytes32): 0x{params.device_id.hex()}")
     print(f"allowed       (bool)   : {params.allowed}")

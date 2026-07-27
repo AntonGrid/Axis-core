@@ -1,10 +1,11 @@
 {
-  "type": "attestation",
-  "device_id": "5Jt8qLz3Nh2Dk7Wf9Rs1Cv4Bm6Xp8Za2Te5Yu7LoPqEr",
-  "manifest_ref": "7Yh3kLZ9wQp2Df8RNsC4tVx1aBmE6PgH3uK9sXyZAbCd",
-  "nonce": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
-  "timestamp": "2026-07-25T10:20:00Z",
+  "schema_version": "1.0",
+  "device_id": "dev_0123abcd4567ef89",
+  "nonce": "attest-nonce-7890ab",
+  "timestamp": "2026-07-25T12:40:00Z",
+  "algo": "mock",
   "payload": {
+    "phase": "attestation",
     "firmware_version": "1.0.3",
     "state": "normal",
     "metrics": {
@@ -17,6 +18,5 @@
       "session_id": "sess-789"
     }
   },
-  "signature": "MEUCIQDd0Thox5Y7u+9id/R9ZG/Tu/nruA5aGbfTg3u6p6Oc7gIgMqnZxs0o3HscO73w3N3PJ1+0p+GzZpR2eI6PY/7q2Zg=",
-  "signature_algorithm": "ed25519"
+  "signature": "0123456701234567012345670123456701234567012345670123456701234567"
 }

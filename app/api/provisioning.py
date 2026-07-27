@@ -39,6 +39,10 @@ async def provisioning_attest(proof: Dict[str, Any]):
     """
     Принимает DeviceProof, валидирует по JSON Schema и возвращает простое решение.
     """
+    # Backwards-compatible: если клиент не прислал schema_version, считаем, что это "1.0"
+    if "schema_version" not in proof:
+        proof = {**proof, "schema_version": "1.0"}
+
     try:
         DEVICE_PROOF_VALIDATOR.validate(proof)
     except ValidationError as e:

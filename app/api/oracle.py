@@ -50,6 +50,9 @@ def _looks_like_attestation(body: dict) -> bool:
 def _handle_legacy_attestation(attestation: dict) -> Dict[str, Any]:
     """
     Обработка старого формата Attestation (используется в tests/test_api.py).
+    Теперь:
+    - обязательна схема attestation.schema.json
+    - обязательна schema_version == "1.0"
     """
     try:
         ATT_VALIDATOR.validate(attestation)
@@ -60,6 +63,27 @@ def _handle_legacy_attestation(attestation: dict) -> Dict[str, Any]:
                 "message": "Invalid Attestation",
                 "error": e.message,
                 "path": list(e.path),
+            },
+        )
+
+    # Проверка schema_version
+    version = attestation.get("schema_version")
+    if version is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Invalid Attestation",
+                "error": "schema_version is required",
+                "path": ["schema_version"],
+            },
+        )
+    if version != "1.0":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Invalid Attestation",
+                "error": f"unsupported schema_version: {version}, expected '1.0'",
+                "path": ["schema_version"],
             },
         )
 
@@ -96,6 +120,10 @@ def _handle_new_attest_request(payload: dict) -> Dict[str, Any]:
     """
     Обработка нового запроса oracle_attest_request (tests/test_oracle_attest.py).
     """
+    # Backwards-compatible: если клиент не прислал schema_version, считаем, что это "1.0"
+    if "schema_version" not in payload:
+        payload = {**payload, "schema_version": "1.0"}
+
     # Схемная валидация
     try:
         validate_payload("oracle_attest_request", payload)

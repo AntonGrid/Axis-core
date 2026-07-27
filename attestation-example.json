@@ -1,4 +1,5 @@
 {
+  "schema_version": "1.0",
   "attestation_id": "att_1a2b3c4d5e6f7890",
   "device_id": "dev_9e9c644e1580a83b",
   "proof": {

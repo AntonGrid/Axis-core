@@ -1,22 +1,18 @@
 {
-  "manifest_id": "7Yh3kLZ9wQp2Df8RNsC4tVx1aBmE6PgH3uK9sXyZAbCd",
+  "schema_version": "1.0",
+  "manifest_id": "urn:enrg:manifest:basic-sensor-v1",
   "version": "1.0.0",
-  "manufacturer": "Acme Energy Devices",
-  "model": "ACME-ENRG-001",
-  "hw_revision": "revA",
-  "fw_version": "1.0.3",
-  "public_key": "9fW3hT2qLp8Vs1DxCr7BnE4mUz6YaP9xLk2SjHoQweRt",
-  "key_type": "ed25519",
+  "manufacturer": "ENRG Labs",
+  "model": "ENRG-Node-100",
+  "hardware_revision": "revA",
+  "firmware_version": "1.0.3",
   "capabilities": [
-    "metering",
-    "telemetry",
-    "remote_update"
+    "energy-metering",
+    "signature-reporting"
   ],
-  "created_at": "2026-07-25T10:15:30Z",
-  "updated_at": "2026-07-25T10:15:30Z",
-  "metadata": {
-    "country": "DE",
-    "voltage_range": "220-240V",
-    "communication": ["wifi", "ethernet"]
-  }
+  "constraints": {
+    "max_power_kw": 5.0,
+    "min_power_kw": 0.0
+  },
+  "created_at": "2026-07-25T10:00:00Z"
 }

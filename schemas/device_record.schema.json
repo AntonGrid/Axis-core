@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "schema_version",
     "device_id",
     "public_key",
     "lifecycle_state",
@@ -14,6 +15,10 @@
     "labels"
   ],
   "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
     "device_id": {
       "type": "string",
       "pattern": "^dev_[0-9a-f]{16}$",

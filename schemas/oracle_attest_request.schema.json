@@ -4,6 +4,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
     "device_id": {
       "type": "string"
     },
@@ -30,5 +34,13 @@
       "type": "string"
     }
   },
-  "required": ["device_id", "nonce", "timestamp", "algo", "payload", "signature"]
+  "required": [
+    "schema_version",
+    "device_id",
+    "nonce",
+    "timestamp",
+    "algo",
+    "payload",
+    "signature"
+  ]
 }

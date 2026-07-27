@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "attestation_id": "att_deny_0011223344556677",
+  "device_id": "dev_deny_42cafeba",
+  "proof": {
+    "device_id": "dev_deny_42cafeba",
+    "nonce": "deny_nonce_9876",
+    "timestamp": "2026-07-25T20:00:00Z",
+    "algo": "mock",
+    "payload": {
+      "max_power_kw": 1.2
+    },
+    "signature": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+  },
+  "decision": {
+    "allowed": false,
+    "reason": "mock-denied-overlimit",
+    "max_power_kw": 1.2
+  },
+  "oracle_id": "oracle_main_1",
+  "issued_at": "2026-07-25T20:05:00Z",
+  "oracle_signature": "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
+}

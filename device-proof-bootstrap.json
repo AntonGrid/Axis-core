@@ -1,21 +1,21 @@
 {
-  "type": "bootstrap",
-  "device_id": "5Jt8qLz3Nh2Dk7Wf9Rs1Cv4Bm6Xp8Za2Te5Yu7LoPqEr",
-  "manifest_ref": "7Yh3kLZ9wQp2Df8RNsC4tVx1aBmE6PgH3uK9sXyZAbCd",
-  "nonce": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
-  "timestamp": "2026-07-25T10:18:30Z",
+  "schema_version": "1.0",
+  "device_id": "dev_0123abcd4567ef89",
+  "nonce": "bootstrap-nonce-abcdef",
+  "timestamp": "2026-07-25T12:35:00Z",
+  "algo": "mock",
   "payload": {
+    "phase": "bootstrap",
     "firmware_version": "1.0.3",
     "state": "normal",
     "metrics": {
-      "uptime_seconds": 360,
-      "temperature_celsius": 38.5
+      "uptime_seconds": 300,
+      "temperature_celsius": 37.5
     },
     "context": {
       "bootstrap_token": "bootstrap-token-xyz",
       "network": "testnet"
     }
   },
-  "signature": "MEQCIDymV7zqj3e7T0pR6N0PcX1wZWtIR1xKKh4bdR5u2i5bAiBXz1TqN9rMiV4KzzkzMODr35eYfGZx1p7p/zF3t4fVPg==",
-  "signature_algorithm": "ed25519"
+  "signature": "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
 }

@@ -63,7 +63,7 @@ class ENRGClient:
 
     def oracle_attest_legacy(self, attestation: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Отправить полную Attestation в старом формате.
+        Отправить полную Attestation в старом формате (но по новой схеме 1.0).
         Не бросает исключение на 400 — вместо этого печатает ошибку и возвращает тело.
         """
         resp = self._client.post("/oracle/attest", json=attestation)
@@ -89,7 +89,8 @@ class ENRGClient:
     ) -> Dict[str, Any]:
         """
         Сконструировать простую Attestation для отладки legacy-режима.
-        Подстраиваемся под attestation.schema.json: proof содержит минимум device_id, nonce, timestamp.
+        Подстраиваемся под attestation.schema.json: schema_version=1.0,
+        proof содержит минимум device_id, nonce, timestamp, payload.max_power_kw.
         """
         now = datetime.now(timezone.utc).replace(microsecond=0)
         issued_at = now.isoformat().replace("+00:00", "Z")
@@ -98,7 +99,8 @@ class ENRGClient:
         attestation_id = f"att_{uuid4().hex[:8]}"
         nonce = "legacy_nonce_123"
 
-        att = {
+        att: Dict[str, Any] = {
+            "schema_version": "1.0",
             "attestation_id": attestation_id,
             "device_id": device_id,
             "proof": {
@@ -111,10 +113,14 @@ class ENRGClient:
                 },
                 "signature": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
             },
-            "decision": {"allowed": allowed, "reason": reason},
+            "decision": {
+                "allowed": allowed,
+                "reason": reason,
+                "max_power_kw": 3.3
+            },
             "oracle_id": oracle_id,
             "issued_at": issued_at,
-            "oracle_signature": "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe",
+            "oracle_signature": "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
         }
         return att
 

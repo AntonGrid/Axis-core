@@ -1,73 +1,145 @@
 # ENRG
 
-ENRG — экспериментальный прототип архитектуры для управления устройствами и их аттестациями с минимальным on-chain слоем.
+ENRG is an experimental prototype architecture for managing devices and their attestations with a minimal on-chain layer.
 
-Цель: зафиксировать **chain-agnostic** подход, где:
+The goal is to establish a **chain-agnostic** trust framework where:
 
-- корень доверия — ключ на устройстве;
-- off-chain слой отвечает за идентичность, Provisioning, Registry, Policy Engine и Oracle;
-- on-chain слой минимален и опирается на attestations от доверенных оракулов.
+- the root of trust is a cryptographic key on the device;
+- the off-chain layer is responsible for identity, Provisioning, Registry, Policy Engine, and Oracle;
+- the on-chain layer is minimal and relies on attestations from trusted oracles.
 
-## Структура репозитория
+ENRG is also the first application built on the broader **Axis Protocol** concept: a higher-level trust layer connecting physical devices with digital systems, including blockchains. In this repo, most elements are “Axis core” (generic attestation and bridging logic), with ENRG providing an energy-domain example (e.g., max power, generation constraints).
 
-- `app/` — off-chain сервисы (FastAPI) и вспомогательный код:
+---
+
+## Repository structure
+
+- `app/` — off-chain services (FastAPI) and helper code:
   - Provisioning Service;
   - Device Registry;
-  - Oracle (`/oracle/attest`, хранение аттестаций);
-  - `onchain_bridge.py` — мост JSON → параметры смарт-контракта.
-- `tests/` — pytest‑тесты для off-chain кода.
-- `schemas/` — JSON Schema для:
+  - Oracle (`/oracle/attest`, attestation storage);
+  - `onchain_bridge.py` — bridge from Attestation JSON to smart‑contract parameters.
+
+- `tests/` — pytest tests for off-chain code:
+  - registration and provisioning tests;
+  - DeviceProof creation/validation;
+  - Oracle (`/oracle/attest`) behavior;
+  - attestation storage and retrieval;
+  - mapping from Attestation JSON to on-chain parameters (`test_onchain_bridge.py`).
+
+- `schemas/` — JSON Schemas for the core artifacts:
   - `DeviceManifest`;
   - `DeviceRecord`;
   - `DeviceProof`;
   - `Attestation`.
-- `attestation-example.json` — пример аттестации Oracle.
-- `scripts/` — вспомогательные скрипты:
-  - `demo_onchain_bridge.py` — демонстрация маппинга off-chain → on-chain.
-- `onchain/` — минимальный on-chain слой (Foundry):
-  - `src/EnrgOracleAttestation.sol` — контракт для приёма аттестаций;
-  - `test/EnrgOracleAttestation.t.sol` — тесты к контракту;
-  - `onchain/README.md` — описание контрактов и тестов.
+
+- `attestation-example.json` — example Oracle attestation used in demos/tests.
+
+- `scripts/` — helper scripts:
+  - `demo_onchain_bridge.py` — demonstrates mapping off-chain Attestation → on-chain parameters;
+  - `send_attestation_onchain.py` — end-to-end demo (Oracle-style attestation → on-chain submit to local node);
+  - `full_oracle_onchain_demo.py` — extended end-to-end demo (optional).
+
+- `onchain/` — minimal on-chain layer (Foundry):
+  - `src/EnrgOracleAttestation.sol` — reference contract for receiving/storing attestations;
+  - `test/EnrgOracleAttestation.t.sol` — contract tests;
+  - `onchain/README.md` — on-chain contracts and tests documentation.
+
 - `docs/`:
-  - `onchain-attestation.md` — спецификация маппинга Attestation JSON → параметры `submitAttestation`.
+  - `onchain-attestation.md` — detailed mapping specification from Attestation JSON to `submitAttestation` parameters;
+  - (optionally) Axis / architecture notes (`axis-architecture.md`, etc.).
 
-## Off-chain слой (Python / FastAPI)
+---
 
-Основные компоненты:
+## Conceptual overview
 
-- **Provisioning Service** — регистрирует устройства, создаёт `DeviceRecord`.
-- **Device Registry** — источник истины по устройствам:
-  - `device_id`, ключи, владелец, состояние жизненного цикла, версия прошивки, `manifest_ref`.
-- **Oracle**:
-  - принимает `DeviceProof`;
-  - применяет политику (mock Policy Engine);
-  - выдаёт `Attestation` с решением (`allowed`, `max_power_kw` и т.п.);
-  - хранит аттестации для последующей выборки.
+### Axis Protocol (core layer)
 
-JSON Schema и формат артефактов описаны в `schemas/` и используются в тестах.
+Axis is the underlying protocol idea behind ENRG. It defines:
 
-### Тесты off-chain
+- how devices are provisioned and registered;
+- how devices produce attestations (via `DeviceProof` and `DeviceManifest`);
+- how Oracles / Registries / Policy Engines validate these proofs;
+- how validated attestations are bridged to a minimal on-chain representation.
 
-Из корня репозитория:
+In the current implementation:
+
+- **Off-chain core includes:**
+  - JSON schemas (`schemas/`);
+  - Provisioning and Registry flows (FastAPI app);
+  - Oracle endpoint and decision logic (mock Policy Engine);
+  - bridge helper (`app/onchain_bridge.py`) that translates attestation JSON into on-chain calldata.
+
+- **On-chain core includes:**
+  - `EnrgOracleAttestation.sol` as a reference contract for:
+    - accepting attestations from trusted oracle addresses;
+    - storing a minimal attestation structure;
+    - emitting events for downstream consumers.
+
+### ENRG (first application on Axis)
+
+ENRG is the first domain-specific application on Axis, focused on **energy**:
+
+- the Oracle produces a decision with domain-specific fields such as:
+  - `allowed` — whether the device is allowed to operate / inject power;
+  - `max_power_kw` — maximum allowed power in kW for the device;
+- these are interpreted and then mapped into a minimal on-chain representation (e.g., watts, boolean flags).
+
+Future directions include:
+
+- **SRC** (tokenized representation of verified energy production) built on top of Axis attestations;
+- settlement and incentive logic using on-chain attestations as ground truth.
+
+---
+
+## Off-chain layer (Python / FastAPI)
+
+The main components are:
+
+- **Provisioning Service**
+  - Registers devices and creates a `DeviceRecord`.
+  - Associates `device_id`, keys, ownership data, firmware version, and references to the device manifest.
+
+- **Device Registry**
+  - Source of truth for devices:
+    - `device_id`, public keys;
+    - owner / operator;
+    - lifecycle state (e.g., provisioned, active, revoked);
+    - firmware version;
+    - `manifest_ref` (reference to `DeviceManifest`).
+
+- **Oracle**
+  - Accepts a `DeviceProof` (evidence generated by the device and/or provisioning pipeline).
+  - Applies policy (currently a **mock Policy Engine**):
+    - Business / technical rules (placeholder in this prototype).
+  - Issues an `Attestation` with a decision payload, including:
+    - `allowed` (bool);
+    - `max_power_kw` and other domain-specific fields.
+  - Stores attestations for later retrieval (e.g., for bridges or auditors).
+
+JSON Schemas and artifact formats are defined in `schemas/` and enforced in tests under `tests/`.
+
+---
+
+## Off-chain tests
+
+Run from the repository root:
 
 ```bash
-source .venv/bin/activate
+source .venv/bin/activate  # optional, if you use a virtualenv
 pytest -q
-Они покрывают:
+Tests cover:
 
-регистрацию устройств;
-создание и проверку DeviceProof;
-работу Oracle (/oracle/attest);
-хранение и чтение аттестаций;
-маппинг JSON Attestation → on-chain параметры (test_onchain_bridge.py).
-On-chain слой (Foundry)
-Находится в каталоге onchain/.
+device registration and provisioning;
+creation and validation of DeviceProof;
+Oracle behavior (/oracle/attest);
+storing and retrieving attestations;
+mapping Attestation JSON → on-chain parameters (tests/test_onchain_bridge.py).
+On-chain layer (Foundry)
+The on-chain components live under onchain/.
 
-Ключевой контракт:
-
-EnrgOracleAttestation:
-
-хранит минимальную структуру:
+Key contract: EnrgOracleAttestation
+The contract stores a minimal core attestation structure:
 
 struct AttestationCore {
     bytes32 attestationId;
@@ -77,49 +149,42 @@ struct AttestationCore {
     address oracle;
     uint64 issuedAt; // unix timestamp
 }
-принимает аттестации только от доверенных оракулов (setTrustedOracle / trustedOracles);
+Core properties:
 
-не позволяет записать одну и ту же attestationId дважды;
-
-эмитит событие Attested.
-
-Тесты на контракт:
+Accepts attestations only from trusted oracles:
+setTrustedOracle(address,bool)
+trustedOracles(address) → bool
+Does not allow the same attestationId to be recorded twice.
+Emits an Attested event on successful submission.
+Provides read access for stored attestations (see contract for details).
+On-chain tests
+From the onchain/ directory:
 
 cd onchain
 forge test -q
-Подробнее см. onchain/README.md.
+See onchain/README.md for more details about:
 
-Мост off-chain → on-chain
-Маппинг Attestation JSON → параметры submitAttestation реализован в:
+test coverage and scenarios;
+gas considerations;
+event structure and usage patterns.
+Bridge: Off-chain → On-chain
+The mapping from Attestation JSON to submitAttestation parameters is implemented in:
 
-app/onchain_bridge.py — функция:
+app/onchain_bridge.py — main function:
+build_attestation_params(attestation: dict) -> Tuple[bytes32, bytes32, bool, int, int]
+What it does:
 
-build_attestation_params(attestation: dict)
-Она:
-
-получает аттестацию вида attestation-example.json;
-считает keccak256 от attestation_id и device_id → bytes32 значения для контракта;
-конвертирует decision.max_power_kw → maxPowerW (ватты);
-парсит issued_at (ISO 8601, Z) → issuedAt (unix timestamp).
-Текстовая спецификация маппинга:
-
-docs/onchain-attestation.md
-Демонстрация маппинга (скрипт)
-Из корня репозитория:
-
-source .venv/bin/activate
-python scripts/demo_onchain_bridge.py
-Скрипт:
-
-читает attestation-example.json;
-строит параметры для смарт-контракта;
-выводит готовые значения:
-attestationId (bytes32): 0x...
-deviceId      (bytes32): 0x...
-allowed       (bool)   : true/false
-maxPowerW     (uint64) : XXXX
-issuedAt      (uint64) : 1XXXXXXXXX
-Эти параметры соответствуют сигнатуре:
+Input: an attestation of the form in attestation-example.json.
+ID hashing:
+Computes keccak256 of attestation_id string → attestationId (bytes32).
+Computes keccak256 of device_id string → deviceId (bytes32).
+Power conversion:
+Extracts decision.max_power_kw (float / decimal).
+Converts to watts: maxPowerW (uint64).
+Timestamp conversion:
+Parses issued_at (ISO 8601 with trailing Z).
+Converts to Unix timestamp (issuedAt as uint64).
+The resulting parameters correspond exactly to the contract’s submitAttestation signature:
 
 submitAttestation(
     bytes32 attestationId,
@@ -128,10 +193,111 @@ submitAttestation(
     uint64 maxPowerW,
     uint64 issuedAt
 )
-и могут быть напрямую использованы при вызове контракта в локальной сети (anvil, Hardhat и т.п.).
+A textual mapping specification, including field-by-field descriptions and examples, is in:
 
-Статус
-Off-chain: рабочий прототип с тестами и схемами.
-On-chain: минимальный контракт с проверками и тестами в Foundry.
-Мост: реализован и задокументирован.
-Этот репозиторий можно использовать как основу для дальнейших итераций (Policy Engine, продвинутый Oracle, интеграция с разными сетями и т.д.).
+docs/onchain-attestation.md
+Demo: mapping Attestation JSON → on-chain parameters
+From the repository root:
+
+source .venv/bin/activate
+python scripts/demo_onchain_bridge.py
+The script:
+
+reads attestation-example.json;
+builds parameters for the smart contract via build_attestation_params;
+prints ready-to-use values:
+attestationId (bytes32): 0x...
+deviceId      (bytes32): 0x...
+allowed       (bool)   : true/false
+maxPowerW     (uint64) : XXXX
+issuedAt      (uint64) : 1XXXXXXXXX
+These parameters can be fed directly into submitAttestation on a local network (Anvil, Hardhat, etc.).
+
+End-to-end local on-chain demo
+This section describes how to run a full flow:
+
+Prerequisites
+
+Foundry (provides forge, anvil, cast);
+Python 3.x, venv (optional but recommended);
+web3.py (for Python-based on-chain interaction).
+1) Start a local Ethereum node (Anvil)
+In a dedicated terminal:
+
+anvil
+Leave it running.
+
+2) Deploy the on-chain Attestation contract
+In another terminal (with Foundry installed and anvil running):
+
+cd onchain
+forge create src/EnrgOracleAttestation.sol:EnrgOracleAttestation \
+  --rpc-url http://127.0.0.1:8545 \
+  --private-key <PRIVATE_KEY_OF_ANVIL_ACCOUNT> \
+  --broadcast
+Note the deployed address from the output:
+
+Deployed to: 0x<your-contract-address>
+3) Prepare environment variables for interaction
+In the same or a new terminal:
+
+export CONTRACT=0x<your-contract-address>
+export RPC=http://127.0.0.1:8545
+export PK=<private-key-for-signer>  # must control a funded anvil account
+4) Mark a trusted oracle
+Using cast (or any tool you prefer):
+
+OWNER=0x<owner-address>  # e.g., an anvil account
+
+cast send $CONTRACT \
+  "setTrustedOracle(address,bool)" \
+  $OWNER true \
+  --rpc-url $RPC \
+  --private-key $PK
+
+# Verify:
+cast call $CONTRACT \
+  "trustedOracles(address)(bool)" \
+  $OWNER \
+  --rpc-url $RPC
+5) Run the end-to-end on-chain demo script
+From the repo root (with your Python environment active):
+
+source .venv/bin/activate  # if using venv
+python scripts/send_attestation_onchain.py
+Expected behavior:
+
+prints:
+the Attestation JSON;
+on-chain parameters derived by build_attestation_params;
+submitted transaction hash;
+transaction status;
+stored attestation as read back from the contract.
+Note: if you restart Anvil, you must re-deploy the contract and re-configure the trusted oracle. The demo is meant to run in a single local session.
+
+Status
+Off-chain: working prototype with FastAPI services, JSON Schemas, and tests.
+On-chain: minimal contract with safety checks and Foundry tests.
+Bridge: implemented and documented; demo scripts provided.
+Axis / ENRG: serves as a reference architecture for:
+future Policy Engine iterations;
+more advanced Oracle logic;
+multi-chain integration;
+future tokenization (e.g., SRC) and settlement flows on top.
+This repository can be used as a foundation for further work on:
+
+richer policy definitions (risk scoring, contextual constraints);
+pluggable Oracle backends;
+support for additional attestation domains beyond energy;
+production-grade deployment and monitoring.
+Contributing
+Contributions are welcome. Typical workflow:
+
+Open an issue for feature requests or bug reports.
+Fork the repo and create a branch for your change.
+Add or update tests:
+pytest -q for off-chain;
+cd onchain && forge test for on-chain.
+Submit a pull request with a clear description and rationale.
+License
+Specify your license here (e.g., MIT License) and any third-party licenses used in the project.
