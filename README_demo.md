@@ -217,3 +217,95 @@ monitoring on-chain results and events.
 For more details on the on-chain side, see:
 
 onchain/README.md — contract function, calldata examples, mainnet checklist.
+
+6. Integrator checklist
+Use this checklist as a minimal guide to integrate ENRG Attestations with your on-chain flow.
+
+Agree on the Attestation format
+Confirm that you use schema_version: "1.0".
+
+Align on the fields: attestation_id, device_id, decision.allowed, decision.max_power_kw, issued_at, oracle_signature.
+
+Decide how you get Attestations:
+
+Online: via ENRG /oracle/attest endpoint.
+
+Offline: from your own storage / another system, already matching the schema.
+
+Validate Attestations (optional but recommended)
+Use SCHEMAS.md and app/schemas/attestation.schema.json.
+
+Optionally validate locally using jsonschema.
+
+Run the local demo once
+Start the backend:
+
+bash
+uvicorn app.main:app --reload --port 8000
+Run the happy-path demo:
+
+bash
+python scripts/full_oracle_onchain_calldata_demo.py \
+  --device-id dev_demo_full_cycle \
+  --max-power-kw 3.3
+Make sure you see both parameters and calldata for submitAttestation(...).
+
+Test the deny case
+Run:
+
+bash
+python scripts/oracle_deny_onchain_calldata_demo.py \
+  --device-id dev_demo_deny \
+  --max-power-kw 10.0
+Confirm that allowed is false and calldata encodes allowed = false.
+
+Choose integration mode
+Mode A — JSON → ENRG script → calldata → your sender
+
+Use scripts/send_attestation_onchain.py or scripts/full_oracle_onchain_calldata_demo.py.
+
+Take the printed calldata and plug it into your transaction builder.
+
+Mode B — JSON → ENRG bridge logic → your contract binding
+
+Reuse app.onchain_bridge.build_attestation_params(...) in your backend or reimplement its logic in your language.
+
+Call your contract binding's submitAttestation(...) with the derived parameters.
+
+Prepare mainnet configuration
+RPC URL and chainId of the target network.
+
+Deployed ENRG contract address with submitAttestation(...).
+
+Operator key / signer for sending transactions.
+
+Gas and fee policy (gas limits, max fee, retries).
+
+Wire into your production pipeline
+Insert the "Attestation → params → calldata/contract call" step into your existing flow (e.g. before enabling power, minting, or updating device state).
+
+Log:
+
+source Attestation JSON,
+
+derived parameters,
+
+transaction hash and status.
+
+Monitor and operate
+Subscribe to contract events and/or transaction receipts.
+
+Build basic alerts for failed transactions or unexpected allowed = false.
+
+Periodically re-run the demo scripts after upgrades to ensure compatibility.
+
+Plan for schema upgrades
+If you move away from schema_version: "1.0", make a migration plan:
+
+update JSON schema,
+
+update bridge logic,
+
+re-run tests and demos,
+
+update docs (API.md, SCHEMAS.md, onchain/README.md, README_demo.md).
