@@ -1,142 +1,189 @@
-# Axis / ENRG JSON Schemas (v1.0)
+# ENRG JSON Schemas
 
-This document summarizes the JSON schemas used in the ENRG / Axis prototype and how they map to API endpoints.
+This document describes the purpose and key fields of the JSON Schemas used
+in the ENRG project. The canonical schema files live in the `schemas/` directory.
+Runtime validation typically uses copies in `app/schemas/`.
 
-## Versioning
+All Attestation-related flows are aligned on `schema_version: "1.0"`.
 
-All primary JSON types are versioned via a top-level field:
+---
+
+## 1. Attestation (`schemas/attestation.schema.json`)
+
+**Purpose**
+
+Represents a complete, signed Attestation that can be used to drive on-chain
+decisions (through the on-chain bridge).
+
+**Minimal example (allow)**
 
 ```json
 {
   "schema_version": "1.0",
-  "..."
-}
-Current stable version: 1.0
-New major changes MUST bump schema_version (e.g. "2.0") and live in new schemas (e.g. *_v2.schema.json), while API handlers should explicitly accept both when needed.
-Schemas overview
-Type	Schema file	Required schema_version	Used by
-Attestation	schemas/attestation.schema.json	"1.0"	/oracle/attest (legacy attestation mode)
-DeviceManifest	schemas/device_manifest.schema.json	"1.0"	Provisioning/registry services (off-chain only)
-DeviceRecord	schemas/device_record.schema.json	"1.0"	Registry service (off-chain only)
-DeviceProof	schemas/device_proof.schema.json	"1.0"	/provisioning/attest
-OracleAttestReq	schemas/oracle_attest_request.schema.json	"1.0"	/oracle/attest (new oracle request mode)
-Attestation (legacy)
-Schema: schemas/attestation.schema.json
-API: POST /oracle/attest (legacy mode, when body looks like a full attestation)
-
-Required top-level fields (simplified):
-
-schema_version: "1.0"
-attestation_id: string
-device_id: string
-oracle_id: string
-issued_at: string (ISO 8601)
-decision: object
-proof: object
-oracle_signature: string
-Server-side rules:
-
-Schema is validated strictly.
-schema_version is required and must be "1.0".
-issued_at is additionally validated as ISO 8601 timestamp.
-DeviceManifest (1.0)
-Schema: schemas/device_manifest.schema.json
-Canonical example: device-manifest-example.json
-
-Minimal shape:
-
-{
-  "schema_version": "1.0",
-  "manifest_id": "urn:enrg:manifest:basic-sensor-v1",
-  "version": "1.0.0",
-  "manufacturer": "ENRG Labs",
-  "model": "ENRG-Node-100",
-  "hardware_revision": "revA",
-  "firmware_version": "1.0.3",
-  "capabilities": ["energy-metering", "signature-reporting"],
-  "constraints": {
-    "max_power_kw": 5.0,
-    "min_power_kw": 0.0
+  "attestation_id": "661a8435-b9ec-4722-8654-c92ef0e172e5",
+  "device_id": "dev_demo_full_cycle",
+  "proof": {
+    "device_id": "dev_demo_full_cycle",
+    "nonce": "demo_nonce_123",
+    "timestamp": "2026-07-27T05:34:03Z",
+    "algo": "mock",
+    "payload": {
+      "max_power_kw": 3.3
+    },
+    "signature": "deadbeefdeadbeef..."
   },
-  "created_at": "2026-07-25T10:00:00Z"
+  "decision": {
+    "allowed": true,
+    "reason": "ok",
+    "max_power_kw": 3.3
+  },
+  "oracle_id": "oracle_main_1",
+  "issued_at": "2026-07-27T05:34:03Z",
+  "oracle_signature": "cafebabecafebabe..."
 }
-DeviceRecord (1.0)
-Schema: schemas/device_record.schema.json
-Canonical example: device-record-example.json
-API: Registry service (off-chain), typically exposed as GET /registry/devices/{device_id}.
+Minimal example (deny) — see attestation-example-deny.json.
 
-Minimal shape:
+Key fields
+
+schema_version (string, required)
+Must be "1.0" for this version of the schema.
+
+attestation_id (string, required)
+Logical identifier of the attestation; usually matches the oracle’s attestation_id.
+
+device_id (string, required)
+Device identifier, consistent with /oracle/attest and on-chain encoding.
+
+proof (object, required)
+Device-level proof. Structure is intentionally flexible but includes:
+
+device_id (string)
+nonce (string)
+timestamp (RFC3339/ISO 8601 string, UTC, e.g. 2026-07-27T05:34:03Z)
+algo (string) – algorithm or proof type, "mock" in demos.
+payload (object) – e.g. { "max_power_kw": 3.3 }
+signature (string) – opaque hex/string signature.
+decision (object, required)
+
+allowed (boolean) – whether the device is allowed.
+reason (string) – human-readable explanation.
+max_power_kw (number) – effective limit in kW.
+Additional fields (like limit_kw) may appear in oracle responses, but the Attestation schema focuses on the effective outcome.
+oracle_id (string, required)
+Identifier of the oracle instance.
+
+issued_at (string, required)
+RFC3339/ISO 8601 timestamp of when the oracle issued this attestation.
+
+oracle_signature (string, required)
+Oracle’s signature over the attestation content (opaque for the schema).
+
+This document is what app.onchain_bridge.build_attestation_params() consumes.
+
+2. Oracle attest request (schemas/oracle_attest_request.schema.json)
+Purpose
+
+Validates requests sent to POST /oracle/attest.
+
+Example
+
+{
+  "device_id": "dev_demo_full_cycle",
+  "nonce": "demo_nonce_123",
+  "max_power_kw": 3.3
+}
+Key fields
+
+device_id (string, required)
+Device identifier, must be stable and unique.
+
+nonce (string, required)
+Client nonce for replay protection / correlation.
+
+max_power_kw (number, required)
+Requested maximum power in kW.
+
+The corresponding oracle response is structurally compatible but is not itself a full Attestation (no schema_version, no full proof or oracle_signature).
+
+3. Device manifest (schemas/device_manifest.schema.json)
+Purpose
+
+Describes static properties and capabilities of a device.
+
+Example (abridged)
 
 {
   "schema_version": "1.0",
-  "device_id": "dev_0123abcd4567ef89",
-  "public_key": "ed25519:...",
-  "owner": "did:example:org-enrg-lab-1",
-  "lifecycle_state": "active",
-  "firmware_version": "1.0.3",
-  "manifest_ref": "urn:enrg:manifest:basic-sensor-v1",
-  "created_at": "2026-07-25T12:10:00Z",
-  "updated_at": "2026-07-25T12:20:00Z",
-  "labels": {
-    "site": "berlin-dc1",
-    "env": "prod"
+  "device_id": "dev_demo_001",
+  "manufacturer": "Example Inc.",
+  "model": "X-1000",
+  "capabilities": {
+    "max_power_kw": 5.0
   }
 }
-DeviceProof (1.0)
-Schema: schemas/device_proof.schema.json
-Canonical examples (repo root):
+Typical fields:
 
-device-proof-provisioning.json
+schema_version (string) – version of the manifest schema, "1.0" in this repo.
+device_id (string) – unique device identifier.
+manufacturer, model (strings) – device metadata.
+capabilities (object) – structured technical capabilities (e.g. maximum power).
+4. Device proof (schemas/device_proof.schema.json)
+Purpose
+
+Represents cryptographic evidence or other structured proof used during device bootstrap or provisioning.
+
+There may be multiple flavors of proofs (bootstrap, attestation, provisioning); the schema ensures they all share a consistent core structure.
+
+Typical fields:
+
+schema_version (string)
+device_id (string)
+nonce (string)
+timestamp (string, RFC3339)
+algo (string) – algorithm used for the proof.
+payload (object) – algorithm-specific payload.
+signature (string) – proof signature.
+Example documents:
+
 device-proof-bootstrap.json
 device-proof-attestation.json
-API: POST /provisioning/attest
+device-proof-provisioning.json
+5. Device record (schemas/device_record.schema.json)
+Purpose
 
-Minimal valid shape:
+Aggregated record that ENRG keeps about a device, combining:
 
-{
-  "schema_version": "1.0",
-  "device_id": "dev_0123abcd4567ef89",
-  "nonce": "random-nonce",
-  "timestamp": "2026-07-25T12:30:00Z",
-  "algo": "mock",
-  "payload": {
-    "...": "arbitrary device payload, e.g. state/metrics/context"
-  },
-  "signature": "hex-or-base-encoded-signature"
-}
-Server-side behavior:
-
-If schema_version is missing, the API currently defaults it to "1.0" for backward compatibility.
-Device id is checked against the in-memory registry; if device is unknown, API returns 400 with:
-detail.message = "Invalid DeviceProof"
-detail.path = ["device_id"].
-Oracle Attest Request (1.0)
-Schema: schemas/oracle_attest_request.schema.json
-API: POST /oracle/attest (new request/decision mode)
-
-Minimal valid shape:
+basic identity fields,
+manifest information,
+proofs,
+potentially derived state.
+Example (very abridged)
 
 {
   "schema_version": "1.0",
-  "device_id": "dev_0123abcd4567ef89",
-  "nonce": "abc12345xyz",
-  "timestamp": "2026-07-25T19:00:00Z",
-  "algo": "mock",
-  "payload": {
-    "max_power_kw": 2.5
-  },
-  "signature": "deadbeef..."
+  "device_id": "dev_demo_001",
+  "manifest": { "...": "..." },
+  "proofs": [
+    { "...": "..." }
+  ]
 }
-Server-side behavior (new mode):
+Field details depend on your implementation, but the schema enforces:
 
-If schema_version is missing, the API defaults to "1.0" before schema validation.
-Timestamp is additionally validated as ISO 8601 string with Z suffix.
-Oracle computes a simple decision:
-If max_power_kw > 5.0: allowed = false, reason = "max_power_exceeded".
-Else: allowed = true, reason = "ok".
-Result is stored in in-memory _ATTESTATIONS with a generated attestation_id.
+presence of device_id,
+presence of a manifest-like block,
+an array of proofs.
+Reference example lives in device-record-example.json.
 
-Backward compatibility notes
-Legacy Attestation (full object with proof/decision/oracle_id/...) is still supported on /oracle/attest and strictly requires schema_version: "1.0".
-DeviceProof and OracleAttestRequest APIs are tolerant to missing schema_version and auto-default it to "1.0".
-Example JSONs in examples/ may represent legacy or experimental formats and are not guaranteed to validate against the current 1.0 schemas; for canonical shapes, use the examples in the repo root
+6. Runtime schemas (app/schemas/*.json)
+The app/schemas/ directory contains runtime copies of the schemas used for:
+
+validating incoming HTTP requests,
+validating constructed Attestation documents during demos.
+They should stay in sync with the reference schemas in schemas/.
+
+Key files:
+
+app/schemas/attestation.schema.json
+app/schemas/oracle_attest_request.schema.json
+The demo scripts (scripts/*.py, onchain/scripts/*.py) use these schemas to validate that everything they send/build is consistent with schema_version: "1.0" and the on-chain bridge expectations.
+

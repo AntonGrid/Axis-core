@@ -1,185 +1,101 @@
-# ENRG Onchain
+# ENRG On-chain Bridge & Demos
 
-Этот модуль содержит on‑chain часть системы ENRG:
+This directory contains documentation and helper scripts for bridging
+ENRG Attestations into on-chain calls.
 
-- смарт‑контракт `EnrgOracleAttestation` для хранения аттестаций устройств;
-- Foundry‑конфиг и тесты;
-- скрипты для локального развёртывания и end‑to‑end демо.
+The core goal is to take a JSON Attestation (aligned with `schema_version: "1.0"`)
+and turn it into parameters and calldata for the Solidity function:
 
-Контракт позволяет доверенным оракулам публиковать аттестации устройств с ограничением по мощности и временем выпуска.
+```solidity
+submitAttestation(
+  bytes32 attestationId,
+  bytes32 deviceId,
+  bool allowed,
+  uint64 maxPowerW,
+  uint64 issuedAt
+)
+The heavy lifting (hashing, encoding) is done by:
 
----
+app.onchain_bridge.build_attestation_params(attestation: dict)
+1. Scripts overview
+There are two main kinds of scripts:
 
-## Структура
+Offline — start from a JSON file in the repo.
+Online — call the ENRG backend (/oracle/attest) and then build an Attestation.
+1.1 Offline scripts
+a) scripts/demo_onchain_bridge.py
 
-- `src/EnrgOracleAttestation.sol` — основной контракт.
-- `script/` — скрипты для Foundry (если используются).
-- `test/` — тесты Foundry.
-- `scripts/` — утилиты и демо‑скрипты на Python (например, `send_attestation_onchain.py`).
-- `foundry.toml` — конфигурация Foundry.
+Input: attestation-example.json
+Output: on-chain parameters.
+Usage:
 
----
+python scripts/demo_onchain_bridge.py
+b) scripts/send_attestation_onchain.py
 
-## Быстрый старт с Foundry
+Input: Attestation JSON file (default: attestation-example.json).
+Output: on-chain parameters + ABI-encoded calldata.
+Usage:
 
-### Установка зависимостей
+python scripts/send_attestation_onchain.py \
+  --attestation-file attestation-example.json
+1.2 Online scripts (backend must be running)
+Start the backend first:
 
-Предполагается, что Foundry уже установлен. Если нет, см. инструкции на https://book.getfoundry.sh/.
+uvicorn app.main:app --reload --port 8000
+a) Happy-path: scripts/full_oracle_onchain_calldata_demo.py
 
-Проверка:
+Flow:
 
-```bash
-forge --version
-anvil --version
-cast --version
-Запуск тестов
-cd ~/ENRG/onchain
-forge test
-Локальный запуск сети (Anvil)
-Для локальной разработки и демо используется Anvil — локальная Ethereum‑сеть.
+GET /health
+POST /oracle/attest (new format, allowed = true)
+Build full Attestation (schema_version: "1.0")
+Build on-chain params via build_attestation_params
+Build calldata for submitAttestation(...)
+Example run:
 
-cd ~/ENRG/onchain
-anvil
-Anvil поднимает сеть на http://127.0.0.1:8545 с преднастроенными аккаунтами и приватными ключами (выводится в консоль Anvil).
+python scripts/full_oracle_onchain_calldata_demo.py \
+  --device-id dev_demo_full_cycle \
+  --max-power-kw 3.3
+Example on-chain output:
 
-Деплой контракта EnrgOracleAttestation
-В отдельном терминале (при уже запущенном Anvil):
+On-chain parameters for submitAttestation:
+  attestationId (bytes32): 0xcb083111ab83d966a4ad56a49e42de588d0b8e1838934c23527a5414c283af27
+  deviceId      (bytes32): 0xf04e15f5b2a378dfad0144b46fb0b0165f5fd73d2441156c09f14cc85a470f2f
+  allowed       (bool)   : True
+  maxPowerW     (uint64) : 3300
+  issuedAt      (uint64) : 1785130443
+Example calldata:
 
-cd ~/ENRG/onchain
+0x44b67025cb083111ab83d966a4ad56a49e42de588d0b8e1838934c23527a5414c283af27f04e15f5b2a378dfad0144b46fb0b0165f5fd73d2441156c09f14cc85a470f2f00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000ce4000000000000000000000000000000000000000000000000000000006a66edcb
+This is a fully formed submitAttestation(...) calldata for the allow case.
 
-forge create src/EnrgOracleAttestation.sol:EnrgOracleAttestation \
-  --rpc-url http://127.0.0.1:8545 \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --broadcast
-В конце вывода будет строка вида:
+b) Deny-case: scripts/oracle_deny_onchain_calldata_demo.py
 
-Deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
-Этот адрес контракта будем использовать дальше как CONTRACT.
+Flow:
 
-Работа с контрактом через cast
-Проверить owner
-CONTRACT=0x5FbDB2315678afecb367f032d93F642f64180aa3
-RPC=http://127.0.0.1:8545
+GET /health
+POST /oracle/attest with parameters that trigger a deny (allowed = false)
+Build full Attestation (schema_version: "1.0") from the oracle response
+Ensure decision.allowed = false with a clear reason
+Build on-chain params via build_attestation_params
+Build calldata for submitAttestation(...) with allowed = false
+Example run:
 
-cast call $CONTRACT "owner()(address)" --rpc-url $RPC
-Ожидается адрес первого аккаунта Anvil:
+python scripts/oracle_deny_onchain_calldata_demo.py \
+  --device-id dev_demo_deny \
+  --max-power-kw 10.0
+Example on-chain output:
 
-0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-Отметить trusted oracle
-Используем тот же адрес как доверенный oracle:
+On-chain parameters for submitAttestation (deny-case):
+  attestationId (bytes32): 0x9d9a6305891382bea7ab6a1b881d7662383e3f8c5351dbfd37306a53b3da0e2c
+  deviceId      (bytes32): 0xe46a234dd19c8e5491fc90dcf08df0e0557dc8974d01b7ce7e4ddfc68532da5d
+  allowed       (bool)   : False
+  maxPowerW     (uint64) : 10000
+  issuedAt      (uint64) : 1785130731
+Example calldata:
 
-OWNER=0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
-PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+0x44b670259d9a6305891382bea7ab6a1b881d7662383e3f8c5351dbfd37306a53b3da0e2ce46a234dd19c8e5491fc90dcf08df0e0557dc8974d01b7ce7e4ddfc68532da5d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002710000000000000000000000000000000000000000000000000000000006a66eeeb
+This is a fully formed submitAttestation(...) calldata for the deny case.
 
-cast send $CONTRACT \
-  "setTrustedOracle(address,bool)" \
-  $OWNER true \
-  --rpc-url $RPC \
-  --private-key $PK
-Проверка:
+The scripts do not send transactions — they only print arguments and calldata. You can feed this calldata into your own transaction builder / EOF tooling.
 
-cast call $CONTRACT \
-  "trustedOracles(address)(bool)" \
-  $OWNER \
-  --rpc-url $RPC
-# должно вернуть: true
-End‑to‑end demo: отправка аттестации в контракт
-Этот раздел показывает полный цикл:
-
-запуск локальной сети через Anvil;
-деплой контракта EnrgOracleAttestation;
-установка trusted oracle;
-отправка JSON‑аттестации из Python‑скрипта в контракт.
-1. Запуск Anvil
-В одном терминале:
-
-cd ~/ENRG/onchain
-anvil
-Anvil поднимает сеть на http://127.0.0.1:8545 с преднастроенными аккаунтами.
-
-2. Деплой контракта
-Во втором терминале:
-
-cd ~/ENRG/onchain
-
-forge create src/EnrgOracleAttestation.sol:EnrgOracleAttestation \
-  --rpc-url http://127.0.0.1:8545 \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-  --broadcast
-В конце вывода будет строка:
-
-Deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
-Скопируйте этот адрес контракта и подставьте его в переменную CONTRACT ниже.
-
-3. Python‑окружение
-Создайте и активируйте виртуальное окружение (один раз):
-
-cd ~/ENRG/onchain
-python3 -m venv .venv
-source .venv/bin/activate
-pip install web3
-Дальнейшие команды предполагают активированное .venv. При каждом новом открытии терминала:
-
-cd ~/ENRG/onchain
-source .venv/bin/activate
-4. Переменные окружения
-Во втором терминале (где .venv):
-
-export CONTRACT=0x5FbDB2315678afecb367f032d93F642f64180aa3  # адрес из forge create
-export RPC=http://127.0.0.1:8545
-export PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-
-export ENRG_ORACLE_CONTRACT_ADDRESS=$CONTRACT
-export ENRG_RPC_URL=$RPC
-export ENRG_PRIVATE_KEY=$PK
-Проверьте:
-
-echo $ENRG_ORACLE_CONTRACT_ADDRESS
-# должно вывести адрес контракта
-5. Установка trusted oracle
-Адрес первого аккаунта Anvil:
-
-OWNER=0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
-
-cast send $CONTRACT \
-  "setTrustedOracle(address,bool)" \
-  $OWNER true \
-  --rpc-url $RPC \
-  --private-key $PK
-
-cast call $CONTRACT \
-  "trustedOracles(address)(bool)" \
-  $OWNER \
-  --rpc-url $RPC
-# должно вернуть: true
-6. E2E‑скрипт: scripts/send_attestation_onchain.py
-Скрипт scripts/send_attestation_onchain.py формирует JSON‑аттестацию, конвертирует её в on‑chain формат и вызывает submitAttestation на контракте.
-
-Запуск (в активированном .venv):
-
-cd ~/ENRG/onchain
-python scripts/send_attestation_onchain.py
-Пример вывода:
-
-Using RPC: http://127.0.0.1:8545
-Using account: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-Contract: 0x5FbDB2315678afecb367f032d93F642f64180aa3
-Attestation JSON:
-{'attestation_id': 'attestation-e2e-1', 'device_id': 'device-e2e-abc', 'decision': {'allowed': True, 'max_power_kw': 500.0}, 'issued_at': '2026-07-26T14:15:00Z'}
-On-chain params:
-  attestation_id: 88b2f210858d89623f5da82f0a7198cfb98cfd7eb2c5bff32292af8cc776d678
-  device_id:      bc1d10ed6f4670881c8963fa64e15516c5125e9bbbc928a20ddc404c8da24b34
-  allowed:        True
-  max_power_w:    500000
-  issued_at:      1785075300
-Submitted tx: 0c5c9e66c2575340680f5dc6f73ed5bc7326eb84ba763bd0b0c542cac25db384
-Tx status: 1
-Gas used: 140932
-Stored attestation in contract:
-[b'\x88\xb2\xf2\x10\x85\x8d\x89b?]\xa8/\nq\x98\xcf\xb9\x8c\xfd~\xb2\xc5\xbf\xf3"\x92\xaf\x8c\xc7v\xd6x',
- b'\xbc\x1d\x10\xedoFp\x88\x1c\x89c\xfad\xe1U\x16\xc5\x12^\x9b\xbb\xc9(\xa2\r\xdc@L\x8d\xa2K4',
- True,
- 500000,
- '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
- 1785075300]
-Это подтверждает, что JSON‑аттестация успешно конвертируется и записывается в контракт EnrgOracleAttestation в локальной сети Anvil.

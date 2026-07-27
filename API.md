@@ -1,162 +1,137 @@
-# ENRG / Axis API quick reference
+# ENRG API Overview
 
-## Base URL
+This document describes the public HTTP API exposed by the ENRG backend.
+The goal is to provide a minimal, consistent, and schema-aligned description
+of the endpoints that participate in the attestation → on-chain flow.
 
-By default (local dev): `http://127.0.0.1:8000`
+All request/response payloads are JSON and are validated against the JSON Schemas
+in `app/schemas/` (runtime) and `schemas/` (reference copies).
 
-Run server:
+Base URL (default):
 
-```bash
-uvicorn app.main:app --reload
-1. Provisioning
-1.1 Register device
-POST /provisioning/register
+- `http://localhost:8000`
 
-Registers a device with its public key and returns a device_id and bootstrap policy.
+---
 
-Request body:
+## 1. Health
 
+**Endpoint**
+
+- `GET /health`
+
+**Description**
+
+Simple liveness probe for the backend.
+
+**Response**
+
+```json
 {
-  "public_key": "test-public-key-456"
+  "status": "ok"
 }
-Optional fields:
+2. Oracle attest
+Endpoint
 
-manifest_ref: string – link/URN to a DeviceManifest.
-proof: object – DeviceProof (not required in current tests).
-Response (200):
+POST /oracle/attest
+Description
+
+Evaluate whether a given device is allowed to operate under a requested configuration (e.g. requested power). This is the main entry point for the oracle decision.
+
+Request body
+
+Validated by app/schemas/oracle_attest_request.schema.json.
+
+Typical example:
 
 {
-  "device_id": "dev_xxx",
-  "manifest_ref": "urn:enrg:manifest:basic-sensor-v1",
-  "bootstrap_policy": {
-    "...": "implementation-defined"
-  }
+  "device_id": "dev_demo_full_cycle",
+  "nonce": "demo_nonce_123",
+  "max_power_kw": 3.3
 }
-1.2 Device attestation (DeviceProof)
-POST /provisioning/attest
+Field summary:
 
-Accepts a DeviceProof and returns a simple mock decision.
+device_id (string, required)
+Unique identifier of the device, must be consistent across API calls and on-chain mapping.
 
-Request body (DeviceProof 1.0):
+nonce (string, required)
+Client-provided nonce for replay protection / correlation.
+In demos this is a human-readable string.
 
-{
-  "schema_version": "1.0",
-  "device_id": "dev_xxx",
-  "nonce": "abc12345xyz",
-  "timestamp": "2026-07-25T19:00:00Z",
-  "algo": "mock",
-  "payload": {
-    "max_power_kw": 2.5
-  },
-  "signature": "deadbeef..."
-}
-Notes:
+max_power_kw (number, required)
+Requested maximum power in kW.
 
-schema_version is required by schema but the endpoint defaults to "1.0" if omitted (backward compatible).
-device_id must match a known device from /provisioning/register, otherwise:
-HTTP 400, with detail.message = "Invalid DeviceProof" and detail.path = ["device_id"].
-Response (200):
+Response body
+
+Simplified structure (validated by the same-family schema):
 
 {
-  "status": "ok",
-  "device_id": "dev_xxx",
-  "decision": {
-    "allowed": true,
-    "reason": "mock-allowed"
-  }
-}
-Curl example:
-
-curl -X POST http://127.0.0.1:8000/provisioning/attest \
-  -H "Content-Type: application/json" \
-  -d '{
-    "schema_version": "1.0",
-    "device_id": "dev_xxx",
-    "nonce": "abc12345xyz",
-    "timestamp": "2026-07-25T19:00:00Z",
-    "algo": "mock",
-    "payload": {"max_power_kw": 2.5},
-    "signature": "deadbeefdeadbeefdeadbeefdeadbeef"
-  }'
-2. Oracle
-2.1 Legacy Attestation mode
-POST /oracle/attest (body looks like full Attestation)
-
-Used mainly by tests and legacy/demo flows. Body must conform to attestation.schema.json.
-
-Key requirements:
-
-schema_version: "1.0" – mandatory, no defaulting.
-attestation_id, device_id, oracle_id, issued_at, decision, proof, oracle_signature.
-On success returns:
-
-{
-  "status": "received",
-  "attestation_id": "...",
-  "device_id": "...",
-  "oracle_id": "..."
-}
-2.2 New request/decision mode (OracleAttestRequest)
-POST /oracle/attest (body looks like request with device_id/nonce/timestamp/...)
-
-Accepts a oracle_attest_request payload and returns a decision. Used in tests/test_oracle_attest.py and in on-chain bridge demos.
-
-Request body (OracleAttestRequest 1.0):
-
-{
-  "schema_version": "1.0",
-  "device_id": "dev_0123abcd4567ef89",
-  "nonce": "abc12345xyz",
-  "timestamp": "2026-07-25T19:00:00Z",
-  "algo": "mock",
-  "payload": {
-    "max_power_kw": 2.5
-  },
-  "signature": "deadbeef..."
-}
-Notes:
-
-If schema_version is missing, endpoint defaults to "1.0" before schema validation.
-timestamp must be ISO 8601 with Z suffix, otherwise 400 with schema_validation_error.
-Response (200):
-
-{
-  "device_id": "dev_0123abcd4567ef89",
-  "attestation_id": "uuid-generated",
+  "device_id": "dev_demo_full_cycle",
+  "attestation_id": "661a8435-b9ec-4722-8654-c92ef0e172e5",
   "decision": {
     "allowed": true,
     "reason": "ok",
-    "max_power_kw": 2.5
-  }
+    "max_power_kw": 3.3
+  },
+  "oracle_id": "oracle_main_1"
 }
-Decision rule:
+For deny cases, the decision may look like:
 
-if max_power_kw > 5.0 → allowed = false, reason = "max_power_exceeded";
-else → allowed = true, reason = "ok".
-Curl example:
+"decision": {
+  "allowed": false,
+  "reason": "max_power_exceeded",
+  "max_power_kw": 10.0,
+  "limit_kw": 5.0
+}
+Field summary:
 
-curl -X POST http://127.0.0.1:8000/oracle/attest \
-  -H "Content-Type: application/json" \
-  -d '{
-    "schema_version": "1.0",
-    "device_id": "dev_0123abcd4567ef89",
-    "nonce": "abc12345xyz",
-    "timestamp": "2026-07-25T19:00:00Z",
-    "algo": "mock",
-    "payload": {"max_power_kw": 2.5},
-    "signature": "deadbeefdeadbeefdeadbeefdeadbeef"
-  }'
-2.3 Fetch stored attestation/result
-GET /oracle/attestations/{attestation_id}
+device_id (string) – echoed from request.
+attestation_id (string, UUID) – logical identifier of this oracle decision.
+decision (object):
+allowed (boolean) – whether the device is allowed under the requested conditions.
+reason (string) – short, human-readable explanation.
+max_power_kw (number) – effective max power in kW for this decision.
+limit_kw (number, optional, deny only) – configured limit that was exceeded.
+oracle_id (string, optional) – identifier of the oracle instance.
+This response is not yet the final Attestation, but it contains enough information to build one (see attestation.schema.json and demos).
 
-Returns the original stored object:
+3. Provisioning / bootstrap endpoints
+Note: exact paths and payload details depend on your current implementation. Below is a high-level outline aligned with the JSON schemas.
 
-For legacy mode: full Attestation.
-For new mode: { "request": {..}, "result": {..} }.
-If not found → 404.
+These endpoints handle device provisioning and proofs, validated against:
 
-3. Registry (if enabled in this repo)
-Typical pattern:
+schemas/device_manifest.schema.json
+schemas/device_proof.schema.json
+schemas/device_record.schema.json
+Typical roles:
 
-GET /registry/devices/{device_id} → returns DeviceRecord 1.0 (see device-record-example.json).
-Implementation lives in app/services/* and may be stubbed/mocked in this prototype.
+Device Manifest
+Static description of device capabilities and identifiers.
+
+Device Proof (bootstrap / provisioning)
+Cryptographic material or structured evidence that a device is genuine and bound to a certain identity.
+
+Device Record
+Aggregated, persistent record ENRG keeps about a device (manifest + proofs + state).
+
+If you expose HTTP endpoints like /provisioning/manifest, /provisioning/proof, etc., their payloads should follow the above schemas. The detailed field-level specification lives in SCHEMAS.md.
+
+4. Attestation and on-chain bridge
+The backend does not necessarily expose a /attestation HTTP endpoint; instead, it exposes building blocks:
+
+/oracle/attest — makes a decision (allowed / deny).
+Local utilities — build a full Attestation document from oracle responses.
+app.onchain_bridge.build_attestation_params(attestation) — converts a JSON Attestation into on-chain parameters suitable for a Solidity function
+submitAttestation(
+  bytes32 attestationId,
+  bytes32 deviceId,
+  bool allowed,
+  uint64 maxPowerW,
+  uint64 issuedAt
+)
+The demo scripts in scripts/ and onchain/scripts/ illustrate how to go from:
+
+Raw oracle response → full Attestation (schema_version: "1.0").
+Attestation JSON → on-chain parameters.
+On-chain parameters → ABI-encoded calldata for submitAttestation(...).
+For full details on the Attestation JSON shape, see SCHEMAS.md and schemas/attestation.schema.json.
+
