@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OracleAttestation",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "attestation_id",
+    "device_id",
+    "proof",
+    "decision",
+    "oracle_id",
+    "issued_at",
+    "oracle_signature"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "attestation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "proof": {
+      "type": "object",
+      "required": [
+        "device_id",
+        "nonce",
+        "timestamp",
+        "algo",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "device_id": { "type": "string", "minLength": 1 },
+        "nonce": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "algo": { "type": "string", "minLength": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "max_power_kw": { "type": "number" }
+          },
+          "additionalProperties": true
+        },
+        "signature": { "type": "string", "minLength": 16 }
+      },
+      "additionalProperties": false
+    },
+    "decision": {
+      "type": "object",
+      "required": ["allowed", "reason"],
+      "properties": {
+        "allowed": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "max_power_kw": { "type": "number" }
+      },
+      "additionalProperties": true
+    },
+    "oracle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "oracle_signature": {
+      "type": "string",
+      "minLength": 16
+    }
+  },
+  "additionalProperties": false
+}

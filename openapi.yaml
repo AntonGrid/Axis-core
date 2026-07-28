@@ -1,0 +1,256 @@
+openapi: 3.0.3
+info:
+  title: ENRG Part II Mock API
+  version: "0.1.0"
+
+servers:
+  - url: http://localhost:8000
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /provisioning/register:
+    post:
+      summary: Register a new device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - public_key
+              properties:
+                public_key:
+                  type: string
+                  description: Device public key (e.g., Ed25519)
+      responses:
+        '200':
+          description: Device successfully registered
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - device_id
+                  - manifest_ref
+                  - bootstrap_policy
+                properties:
+                  device_id:
+                    type: string
+                    description: Deterministic device identifier
+                    example: dev_9e9c644e1580a83b
+                  manifest_ref:
+                    type: string
+                    description: Reference to DeviceManifest
+                    example: manifest:v0-placeholder
+                  bootstrap_policy:
+                    type: object
+                    properties:
+                      allowed:
+                        type: boolean
+                        example: true
+                      max_power_kw:
+                        type: number
+                        format: float
+                        example: 3.5
+
+  /registry/devices/{device_id}:
+    get:
+      summary: Get device record by device_id
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: dev_9e9c644e1580a83b
+      responses:
+        '200':
+          description: Device record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRecord'
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Device not found
+
+  /provisioning/attest:
+    post:
+      summary: Submit device attestation proof
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceProof'
+      responses:
+        '200':
+          description: Attestation accepted and decision returned
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - device_id
+                  - decision
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  device_id:
+                    type: string
+                    example: dev_9e9c644e1580a83b
+                  decision:
+                    type: object
+                    properties:
+                      allowed:
+                        type: boolean
+                        example: true
+                      reason:
+                        type: string
+                        example: mock-allowed
+                      max_power_kw:
+                        type: number
+                        format: float
+                        example: 2.5
+        '400':
+          description: Invalid DeviceProof
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Invalid DeviceProof
+                      error:
+                        type: string
+                        example: "'BAD_ID' does not match '^dev_[0-9a-f]{16}$'"
+                      path:
+                        type: array
+                        items:
+                          type: string
+                        example: ["device_id"]
+
+components:
+  schemas:
+    DeviceRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - device_id
+        - public_key
+        - lifecycle_state
+        - manifest_ref
+        - created_at
+        - updated_at
+        - labels
+      properties:
+        device_id:
+          type: string
+          pattern: "^dev_[0-9a-f]{16}$"
+          example: dev_9e9c644e1580a83b
+        public_key:
+          type: string
+          minLength: 16
+          example: test-public-key-123
+        owner:
+          type:
+            - string
+            - "null"
+          example: null
+        lifecycle_state:
+          type: string
+          enum:
+            - provisioned
+            - active
+            - suspended
+            - retired
+          example: provisioned
+        firmware_version:
+          type:
+            - string
+            - "null"
+          example: null
+        manifest_ref:
+          type: string
+          example: manifest:v0-placeholder
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-07-25T18:40:39.728366+00:00"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-07-25T18:40:39.728375+00:00"
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+          example: {}
+
+    DeviceProof:
+      type: object
+      additionalProperties: false
+      required:
+        - device_id
+        - nonce
+        - timestamp
+        - algo
+        - payload
+        - signature
+      properties:
+        device_id:
+          type: string
+          pattern: "^dev_[0-9a-f]{16}$"
+          example: dev_9e9c644e1580a83b
+        nonce:
+          type: string
+          minLength: 8
+          example: abc12345xyz
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-07-25T19:00:00Z"
+        algo:
+          type: string
+          enum:
+            - ed25519
+            - mock
+          example: mock
+        payload:
+          type: object
+          description: Opaque payload signed by the device
+          additionalProperties: true
+          example:
+            max_power_kw: 2.5
+        signature:
+          type: string
+          minLength: 32
+          example: deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef

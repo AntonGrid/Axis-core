@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pydantic
+jsonschema
+httpx
+pycryptodome

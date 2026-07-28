@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://enrg.local/schemas/device_manifest.schema.json",
+  "title": "DeviceManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "version",
+    "manufacturer",
+    "model",
+    "capabilities",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifier of this manifest (e.g., hash or URI)."
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Semantic version of the manifest."
+    },
+    "manufacturer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hardware_revision": {
+      "type": ["string", "null"],
+      "description": "Optional hardware revision identifier."
+    },
+    "firmware_version": {
+      "type": ["string", "null"],
+      "description": "Optional firmware version that this manifest describes."
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "description": "List of high-level capabilities (e.g., 'producer', 'consumer')."
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_power_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "min_power_kw": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

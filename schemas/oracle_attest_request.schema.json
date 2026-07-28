@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Oracle Attest Request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "device_id": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "algo": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "max_power_kw": {
+          "type": "number"
+        }
+      },
+      "required": ["max_power_kw"],
+      "additionalProperties": true
+    },
+    "signature": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "device_id",
+    "nonce",
+    "timestamp",
+    "algo",
+    "payload",
+    "signature"
+  ]
+}
