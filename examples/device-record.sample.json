@@ -1,0 +1,21 @@
+{
+  "device_id": "9Xf1Gh2Jk3Lm4No5Pq6Rs7Tu8Vw9XyAbCdEfGhJkLmNoPqRs",
+  "manifest_ref": "7b3GQk6nM1dH8sZLs9KxV2wqE4pR5aBcDeFgHiJkLmNoPqRsT",
+  "owner": "did:example:org-enrg-lab-1",
+  "public_key": "7uYh8p9qR3s2t1uVwXyZAbCdEfGhJkLmNoPqRsTuVwXyZAbC",
+  "key_type": "ed25519",
+  "lifecycle_state": "active",
+  "firmware_version": "1.0.1",
+  "created_at": "2026-07-25T12:10:00Z",
+  "updated_at": "2026-07-25T12:20:00Z",
+  "last_seen_at": "2026-07-25T12:20:00Z",
+  "tags": [
+    "site:berlin-dc1",
+    "rack:r12",
+    "env:prod"
+  ],
+  "metadata": {
+    "ip_address": "10.0.12.34",
+    "room": "C-12"
+  }
+}

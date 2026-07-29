@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "device_id": "dev_0123abcd4567ef89",
+  "nonce": "bootstrap-nonce-abcdef",
+  "timestamp": "2026-07-25T12:35:00Z",
+  "algo": "mock",
+  "payload": {
+    "phase": "bootstrap",
+    "firmware_version": "1.0.3",
+    "state": "normal",
+    "metrics": {
+      "uptime_seconds": 300,
+      "temperature_celsius": 37.5
+    },
+    "context": {
+      "bootstrap_token": "bootstrap-token-xyz",
+      "network": "testnet"
+    }
+  },
+  "signature": "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
+}

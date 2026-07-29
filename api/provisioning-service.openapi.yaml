@@ -1,0 +1,96 @@
+openapi: 3.0.3
+info:
+  title: ENRG Provisioning Service API
+  version: 1.0.0
+servers:
+  - url: https://provisioning.enrg.local/api
+paths:
+  /provisioning/requests:
+    post:
+      summary: Create provisioning request
+      operationId: createProvisioningRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - public_key
+                - manufacturer_id
+                - model
+                - serial_number
+              properties:
+                public_key:
+                  type: string
+                  description: Public Ed25519 key of device
+                manufacturer_id:
+                  type: string
+                model:
+                  type: string
+                serial_number:
+                  type: string
+                nonce:
+                  type: string
+                timestamp:
+                  type: integer
+      responses:
+        '201':
+          description: Provisioning request accepted, challenge issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - device_id_candidate
+                  - challenge
+                  - expires_at
+                properties:
+                  device_id_candidate:
+                    type: string
+                  challenge:
+                    type: string
+                  expires_at:
+                    type: integer
+  /provisioning/challenge:
+    post:
+      summary: Respond to provisioning challenge
+      operationId: completeProvisioning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - device_id_candidate
+                - challenge
+                - signature
+                - public_key
+              properties:
+                device_id_candidate:
+                  type: string
+                challenge:
+                  type: string
+                signature:
+                  type: string
+                public_key:
+                  type: string
+      responses:
+        '200':
+          description: Device provisioned
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - device_id
+                  - manifest_ref
+                properties:
+                  device_id:
+                    type: string
+                  manifest_ref:
+                    type: string
+                  bootstrap_policy:
+                    type: object
+                    additionalProperties: true
