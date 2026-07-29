@@ -2,22 +2,25 @@
 
 *Status*: Draft  
 *Date*: 2026-07-25  
-*Authors*: ENRG Architecture WG  
+*Authors*: Architecture Working Group
 
 ## Context
 
-We need a clear, verifiable and chain-ready model for device identity,
-as well as a single source of truth for device lifecycle and state.
+Axis Core needs a clear, verifiable, and chain‑ready model for **device
+identity**, as well as a single source of truth for device lifecycle and
+state.
 
-This ADR fixes:
-- the trust model
+This ADR defines:
+
+- the trust model for device identity
 - the main components in the identity path
 - core data artifacts and identifiers
 
 It is the foundation for:
+
 - Policy Engine (PE)
 - Oracle (OR)
-- Smart Contract (SC) and DAO on-chain flows
+- Smart Contract (SC) and on‑chain governance flows
 
 ## Decision
 
@@ -35,9 +38,10 @@ It is the foundation for:
 - `device_id`: deterministic identifier derived from the device public key
   and stable attributes. Current format: **base58**, length 32–64.
 - `manifest_id`: identifier of a device manifest (definition), format: **base58**.
-- `manifest_ref`: reference to `manifest_id` stored in device record and proofs.
+- `manifest_ref`: reference to `manifest_id` stored in device records and proofs.
 
-These constraints are encoded in JSON Schema:
+These constraints are encoded in JSON Schemas:
+
 - `schemas/device-manifest.schema.json`
 - `schemas/device-record.schema.json`
 - `schemas/device-proof.schema.json`
@@ -47,23 +51,23 @@ These constraints are encoded in JSON Schema:
 We define the following components for the identity and registry path:
 
 - **Device** – physical or virtual device holding the private key.
-- **Provisioning Service (PS)** – first contact for the device, verifies proofs and
-  creates/updates records in Device Registry.
+- **Provisioning Service (PS)** – first contact point for the device, verifies
+  proofs and creates/updates records in the Device Registry.
 - **Device Registry (DR)** – single source of truth for:
   - device identity (`device_id`, `public_key`)
   - lifecycle state
   - linkage to manifests
 - **Policy Engine (PE)** – evaluates policies based on device state and proofs.
-- **Oracle (OR)** – off-chain verification and aggregation, signs attestations
-  for on-chain consumption.
-- **Smart Contract (SC)** – minimal on-chain surface:
+- **Oracle (OR)** – off‑chain verification and aggregation, signs attestations
+  for on‑chain or external consumption.
+- **Smart Contract (SC)** – minimal on‑chain surface:
   - validates oracle attestations
   - reflects device state relevant to the chain
-- **DAO** – governs trusted oracles and policies.
+- **Governance component (e.g. DAO)** – governs trusted oracles and policies.
 
 Interaction flow (high level):
 
-`Device → PS → DR → PE → OR → SC → DAO`
+`Device → PS → DR → PE → OR → SC → Governance`
 
 ### 4. Data Artifacts
 
@@ -75,13 +79,13 @@ We standardize three main artifacts:
    - One manifest can be referenced by many device records.
 
 2. **DeviceRecord**
-   - Per-device record in the Device Registry.
+   - Per‑device record in the Device Registry.
    - Contains:
      - `device_id`
      - `public_key`, `key_type`
      - `manifest_ref`
      - `lifecycle_state`
-     - firmware, timestamps, tags, metadata
+     - firmware information, timestamps, tags, metadata
 
 3. **DeviceProof**
    - A signed payload from the device, used for:
@@ -91,16 +95,16 @@ We standardize three main artifacts:
    - Contains:
      - `type` (provisioning | bootstrap | attestation)
      - `device_id`, `manifest_ref`
-     - `nonce` (anti-replay)
+     - `nonce` (anti‑replay)
      - `timestamp`
      - `payload` (firmware, state, metrics, context)
      - `signature`, `signature_algorithm` (Ed25519)
 
-All three artifacts are validated against JSON Schema in `schemas/`.
+All three artifacts are validated against JSON Schemas in `schemas/`.
 
 ### 5. API Surface (OpenAPI 3.0.3)
 
-We define a combined OpenAPI spec for Provisioning Service and Device Registry:
+We define a combined OpenAPI spec for the Provisioning Service and Device Registry:
 
 - File: `openapi/provisioning-registry.yaml`
 - Uses external `$ref` to schemas in `../schemas/`.
@@ -114,42 +118,44 @@ Key endpoints:
 - `POST /devices/{device_id}/bootstrap` – bootstrap proof.
 - `POST /devices/{device_id}/attestations` – regular attestation proof.
 
-This API is **off-chain**, but its contracts are stable and chain-ready:
-- Oracle and PE can rely on Device Registry as source of truth.
-- On-chain SC only needs attestations from Oracle, not the full artifacts.
+This API is **off‑chain**, but its contracts are stable and chain‑ready:
+
+- Oracle and PE can rely on the Device Registry as a source of truth.
+- On‑chain SC only needs attestations from the Oracle, not the full artifacts.
 
 ### 6. Trust Model
 
 - Trust anchor: **private key on the device**.
 - Device Registry is trusted to:
   - store and expose correct mappings (`device_id → public_key` etc.)
-  - maintain lifecycle status
+  - maintain lifecycle status.
 - Policy Engine and Oracle are trusted to:
   - interpret proofs and registry state
-  - return ALLOW/DENY/CHALLENGE/QUARANTINE decisions (PE)
-  - publish attestations for on-chain usage (OR)
-- Smart Contract only trusts:
-  - whitelisted oracles (managed by DAO)
-  - correct signature schemes and formats
+  - return ALLOW / DENY / CHALLENGE / QUARANTINE decisions (PE)
+  - publish attestations for on‑chain or external usage (OR).
+- The smart contract only trusts:
+  - whitelisted oracles (managed by governance)
+  - correct signature schemes and formats.
 
 Replays are mitigated via:
+
 - `nonce` and `timestamp` in `DeviceProof`
-- verification logic in PS / PE / OR (not fully specified here, to be covered in
-  a separate ADR).
+- verification logic in PS / PE / OR (detailed mechanisms are out of scope for
+  this ADR and will be covered separately).
 
 ### 7. Scope
 
 This ADR fixes:
 
 - Identifier formats and their usage.
-- The set of identity-related components and their responsibilities.
+- The set of identity‑related components and their responsibilities.
 - The three core schemas and their purpose.
-- The minimal off-chain API surface to support provisioning and registry.
+- The minimal off‑chain API surface to support provisioning and registry.
 
-Not in scope (to be covered in follow-up ADRs):
+Out of scope (to be covered in follow‑up ADRs):
 
 - Full policy language and PE implementation details.
-- Oracle-to-chain attestation format and SC ABI.
+- Oracle‑to‑chain attestation format and SC ABI.
 - Detailed nonce and replay protection mechanisms.
 - Migration strategies for existing devices.
 
@@ -158,30 +164,36 @@ Not in scope (to be covered in follow-up ADRs):
 ### Positive
 
 - Clear separation of concerns:
-  - Device ↔ PS ↔ DR ↔ PE ↔ OR ↔ SC ↔ DAO.
+  - Device ↔ PS ↔ DR ↔ PE ↔ OR ↔ SC ↔ Governance.
 - Extensible, as schemas and APIs are explicit and versioned.
-- Mainnet-readiness: off-chain contracts are stable, on-chain surface minimal.
-- Reuse: manifests and proofs are reusable across pilots and vendors.
+- Suitable for deployments where an on‑chain component is present, with a
+  minimal on‑chain surface.
+- Reuse: manifests and proofs are reusable across pilots, vendors, and
+  different higher‑level platforms.
 
 ### Negative / Risks
 
 - Additional complexity from multiple components (PS, DR, PE, OR).
 - Need for robust key management and secure key generation on devices.
-- Tight coupling between Device Registry availability and overall system behavior.
+- Tight coupling between Device Registry availability and overall system
+  behavior.
 
 ### Alternatives Considered
 
-1. **Centralized provisioning without public registry**
-   - Simpler, but no single source of truth; weak basis for on-chain verification.
-2. **Direct device-to-chain registration**
+1. **Centralized provisioning without a public registry**
+   - Simpler, but no single source of truth; weak basis for on‑chain or
+     cross‑system verification.
+
+2. **Direct device‑to‑chain registration**
    - Too heavy and complex for constrained devices.
    - Difficult upgrades and governance.
 
 ## Next Steps
 
-- Finalize and version the JSON Schemas (draft-07).
-- Validate OpenAPI spec against tooling (e.g. swagger-cli).
-- Implement reference Provisioning Service and Device Registry using these contracts.
-- Prepare follow-up ADRs:
+- Finalize and version the JSON Schemas (e.g. draft‑07).
+- Validate the OpenAPI spec against tooling (e.g. swagger‑cli).
+- Implement a reference Provisioning Service and Device Registry using these
+  contracts.
+- Prepare follow‑up ADRs, e.g.:
   - `0003-policy-engine-and-oracle`
-  - `0004-on-chain-attestations-and-dao-governance`
+  - `0004-on-chain-attestations-and-governance`
