@@ -1,9 +1,0 @@
-{
-  "provisioning_id": "enrg:prov:7pWq3DkL9sTxF1cV2mBn",
-  "device_id": null,
-  "challenge": {
-    "nonce": "P8pV7dUqT1bZ3nCkR5yLkg==",
-    "expires_at": "2026-07-25T09:31:00Z"
-  },
-  "expected_manifest_ref": "urn:enrg:manifest:basic-sensor-v1"
-}

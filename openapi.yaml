@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: ENRG Part II Mock API
+  title: Axis Core API
   version: "0.1.0"
 
 servers:
@@ -59,14 +59,11 @@ paths:
                     example: manifest:v0-placeholder
                   bootstrap_policy:
                     type: object
-                    properties:
-                      allowed:
-                        type: boolean
-                        example: true
-                      max_power_kw:
-                        type: number
-                        format: float
-                        example: 3.5
+                    description: Initial policy assigned to the device
+                    additionalProperties: true
+                    example:
+                      allowed: true
+                      trust_level: basic
 
   /registry/devices/{device_id}:
     get:
@@ -132,10 +129,6 @@ paths:
                       reason:
                         type: string
                         example: mock-allowed
-                      max_power_kw:
-                        type: number
-                        format: float
-                        example: 2.5
         '400':
           description: Invalid DeviceProof
           content:
@@ -249,7 +242,8 @@ components:
           description: Opaque payload signed by the device
           additionalProperties: true
           example:
-            max_power_kw: 2.5
+            event_type: "production"
+            value: 1000
         signature:
           type: string
           minLength: 32

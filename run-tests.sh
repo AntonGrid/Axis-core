@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Корень репозитория — директория, где лежит этот скрипт
+# Root of the repository
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "==> Running Python tests (pytest)..."
@@ -17,21 +17,4 @@ fi
 pytest -q
 
 echo
-echo "==> Running Foundry tests (forge)..."
-cd "$ROOT_DIR/onchain"
-
-# source ~/.bashrc на случай, если PATH к forge подхватывается там
-# shellcheck disable=SC1090
-if [ -f "$HOME/.bashrc" ]; then
-  source "$HOME/.bashrc"
-fi
-
-if ! command -v forge >/dev/null 2>&1; then
-  echo "ERROR: forge not found in PATH. Make sure Foundry is installed and added to PATH."
-  exit 1
-fi
-
-forge test -q
-
-echo
-echo "==> All tests passed (pytest + forge)."
+echo "==> All tests passed."

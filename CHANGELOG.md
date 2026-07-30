@@ -1,28 +1,28 @@
 # Changelog
 
-All notable changes to ENRG Protocol will be documented in this file.
+All notable changes to Axis Core will be documented in this file.
 
 The format follows the principles of Keep a Changelog.
 
 ---
 
-## [8.0.0] - Unreleased
+## [1.0.0] - Unreleased
 
 ### Added
 
-- ENRG Architecture Book
+- Axis Architecture Book
 - Architecture Decision Records
 - Device Lifecycle Specification
 - Provisioning Specification
 - Protocol Specification
-- Technical Documentation v8.0
+- Technical Documentation v1.0
 - Project Roadmap
 - Security Policy
 - Contributing Guide
 
 ### Changed
 
-- ENRG redefined as an open protocol.
+- Axis Core redefined as a universal reference implementation of Axis Protocol.
 - Repository reorganized.
 - Documentation restructured.
 - Architecture-first development process adopted.
@@ -41,4 +41,4 @@ The format follows the principles of Keep a Changelog.
 
 ## Previous Versions
 
-See Git history for changes before version 8.0.
+See Git history for changes before version 1.0.
