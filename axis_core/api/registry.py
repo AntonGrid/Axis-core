@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.services.registry_service import get_device_record
+from axis_core.services.registry_service import get_device_record
 
 router = APIRouter()
 

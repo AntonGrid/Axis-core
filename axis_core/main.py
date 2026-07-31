@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 
-from app.api.provisioning import router as provisioning_router
-from app.api.registry import router as registry_router
-from app.api.oracle import router as oracle_router
+from axis_core.api.provisioning import router as provisioning_router
+from axis_core.api.registry import router as registry_router
+from axis_core.api.oracle import router as oracle_router
 
 
 app = FastAPI()

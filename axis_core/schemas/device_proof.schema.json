@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://enrg.local/schemas/device_proof.schema.json",
+  "title": "DeviceProof",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "device_id",
+    "nonce",
+    "timestamp",
+    "payload",
+    "signature",
+    "algo"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "device_id": {
+      "type": "string",
+      "pattern": "^dev_[0-9a-f]{16}$",
+      "description": "Identifier of the device that produced this proof."
+    },
+    "nonce": {
+      "type": "string",
+      "minLength": 8,
+      "description": "Random nonce to prevent replay."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the proof was created (device clock or gateway time)."
+    },
+    "algo": {
+      "type": "string",
+      "enum": ["ed25519", "mock"],
+      "description": "Signature algorithm identifier."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Opaque payload that is signed by the device.",
+      "additionalProperties": true
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Signature over (device_id, nonce, timestamp, payload), created by the device private key."
+    }
+  }
+}

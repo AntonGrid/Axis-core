@@ -7,7 +7,7 @@ from jsonschema import Draft7Validator, ValidationError
 
 
 BASE_DIR = Path(__file__).resolve().parent
-SCHEMAS_DIR = BASE_DIR.parent / "schemas"
+SCHEMAS_DIR = BASE_DIR / "schemas"
 
 
 @lru_cache(maxsize=None)

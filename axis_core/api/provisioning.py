@@ -4,8 +4,8 @@ from typing import Dict, Any
 
 from jsonschema import ValidationError
 
-from app.services.provisioning_service import register_device, _DB
-from app.schema_utils import get_validator
+from axis_core.services.provisioning_service import register_device, _DB
+from axis_core.schema_utils import get_validator
 
 
 router = APIRouter()

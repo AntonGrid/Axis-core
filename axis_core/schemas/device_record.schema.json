@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://enrg.local/schemas/device_record.schema.json",
+  "title": "DeviceRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "device_id",
+    "public_key",
+    "lifecycle_state",
+    "manifest_ref",
+    "created_at",
+    "updated_at",
+    "labels"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"]
+    },
+    "device_id": {
+      "type": "string",
+      "pattern": "^dev_[0-9a-f]{16}$",
+      "description": "Deterministic device identifier."
+    },
+    "public_key": {
+      "type": "string",
+      "minLength": 16,
+      "description": "Device public key (e.g., Ed25519) in encoded form."
+    },
+    "owner": {
+      "type": ["string", "null"],
+      "description": "Optional external owner identifier (account, DID, etc.)."
+    },
+    "lifecycle_state": {
+      "type": "string",
+      "enum": [
+        "provisioned",
+        "active",
+        "suspended",
+        "retired"
+      ]
+    },
+    "firmware_version": {
+      "type": ["string", "null"],
+      "description": "Optional firmware version string."
+    },
+    "manifest_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to DeviceManifest (e.g., URI or hash)."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Arbitrary key-value labels/tags for the device."
+    }
+  }
+}

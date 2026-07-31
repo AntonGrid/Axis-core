@@ -1,18 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
 from jsonschema import ValidationError
 
-from app.schema_utils import get_validator, validate_payload
-from app.oracle_storage import _ATTESTATIONS, _REQUESTS
+from axis_core.schema_utils import validate_payload
+from axis_core.oracle_storage import _ATTESTATIONS, _REQUESTS
 
 router = APIRouter(prefix="/oracle", tags=["oracle"])
-
-# Validators
-ATT_VALIDATOR = get_validator("attestation")
-REQUEST_VALIDATOR = get_validator("oracle_attest_request")
 
 
 def _ensure_iso8601_z(ts: str) -> None:
@@ -62,7 +58,7 @@ def _build_attestation_from_request(request: Dict[str, Any]) -> Dict[str, Any]:
 
     # Generate attestation
     att_id = str(uuid4())
-    now = datetime.utcnow().isoformat(timespec="seconds").replace("+00:00", "Z")
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
     attestation = {
         "schema_version": "1.0",
@@ -103,7 +99,7 @@ async def oracle_attest(payload: Dict[str, Any]) -> Dict[str, Any]:
     # Mode 1: Legacy Attestation
     if "attestation_id" in payload and "schema_version" in payload:
         try:
-            validate_payload(payload, "attestation", ATT_VALIDATOR)
+            validate_payload("attestation", payload)
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=f"Validation error: {e.message}")
 
@@ -119,7 +115,7 @@ async def oracle_attest(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     # Mode 2: New oracle_attest_request
     try:
-        validate_payload(payload, "oracle_attest_request", REQUEST_VALIDATOR)
+        validate_payload("oracle_attest_request", payload)
 
         # Validate timestamp if present
         if "timestamp" in payload:
@@ -134,7 +130,7 @@ async def oracle_attest(payload: Dict[str, Any]) -> Dict[str, Any]:
         _REQUESTS[request_id] = {
             "request": payload,
             "attestation_id": att_id,
-            "created_at": datetime.utcnow().isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         }
         _ATTESTATIONS[att_id] = attestation
 

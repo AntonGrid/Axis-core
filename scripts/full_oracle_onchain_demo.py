@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from app.onchain_bridge import build_attestation_params  # noqa: E402
+from axis_core.onchain_bridge import build_attestation_params  # noqa: E402
 from tools.client import ENRGClient  # noqa: E402
 
 

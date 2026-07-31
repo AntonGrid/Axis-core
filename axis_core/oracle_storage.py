@@ -1,4 +1,10 @@
-# app/oracle_storage.py
+# axis_core/oracle_storage.py
+from typing import Dict, Any
+
+# Global in-memory storage for attestations and requests
+_ATTESTATIONS: Dict[str, Dict[str, Any]] = {}
+_REQUESTS: Dict[str, Dict[str, Any]] = {}
+
 
 class InMemoryOracleStorage:
     """

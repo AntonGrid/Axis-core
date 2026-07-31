@@ -22,7 +22,7 @@ def test_attestation_deny_example_validates_against_schema():
     # This will raise jsonschema.ValidationError if invalid
     jsonschema.validate(instance=example, schema=schema)
 
-from app.onchain_bridge import build_attestation_params
+from axis_core.onchain_bridge import build_attestation_params
 
 
 def test_build_attestation_params_deny_case():
