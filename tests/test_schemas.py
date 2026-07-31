@@ -13,7 +13,7 @@ def load_json(path: Path):
 
 
 def test_attestation_example_matches_schema():
-    schema_path = BASE_DIR / "schemas" / "attestation.schema.json"
+    schema_path = BASE_DIR / "axis_core" / "schemas" / "attestation.schema.json"
     example_path = BASE_DIR / "attestation-example.json"
 
     schema = load_json(schema_path)

@@ -3,6 +3,8 @@ from pathlib import Path
 
 import jsonschema
 
+from axis_core.onchain_bridge import build_attestation_params
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -13,7 +15,7 @@ def load_json(path: Path):
 
 
 def test_attestation_deny_example_validates_against_schema():
-    schema_path = BASE_DIR / "app" / "schemas" / "attestation.schema.json"
+    schema_path = BASE_DIR / "axis_core" / "schemas" / "attestation.schema.json"
     example_path = BASE_DIR / "attestation-example-deny.json"
 
     schema = load_json(schema_path)
@@ -21,8 +23,6 @@ def test_attestation_deny_example_validates_against_schema():
 
     # This will raise jsonschema.ValidationError if invalid
     jsonschema.validate(instance=example, schema=schema)
-
-from axis_core.onchain_bridge import build_attestation_params
 
 
 def test_build_attestation_params_deny_case():
