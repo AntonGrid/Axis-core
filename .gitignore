@@ -72,3 +72,4 @@ admin-keypair.json
 oracle-keypair.json
 validator.log
 test-ledger/
+__pycache__/
