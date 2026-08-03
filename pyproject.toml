@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "axis-core"
 version = "0.1.0"
-description = "Core blockchain and oracle library for AXIS protocol"
+description = "Universal reference implementation of the Axis Protocol — domain- and platform-agnostic trust standard"
 readme = "README.md"
 authors = [
     { name = "Anton Gridnev", email = "antongrid@example.com" },
