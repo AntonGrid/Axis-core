@@ -6,6 +6,16 @@ The format follows the principles of Keep a Changelog.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- License metadata aligned with the repository `LICENSE` file: SPDX
+  `Apache-2.0` (was `MIT`).
+- Author metadata corrected to Anton Gulda.
+
+---
+
 ## [1.0.0] - Unreleased
 
 ### Added

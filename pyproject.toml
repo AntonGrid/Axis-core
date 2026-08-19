@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "Universal reference implementation of the Axis Protocol — domain- and platform-agnostic trust standard"
 readme = "README.md"
 authors = [
-    { name = "Anton Gridnev", email = "antongrid@example.com" },
+    { name = "Anton Gulda", email = "antongulda@example.com" },
 ]
-license = { text = "MIT" }
+license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi",
