@@ -2,7 +2,7 @@
 
 This document describes the purpose and key fields of the JSON Schemas used
 in the Axis Core project. The canonical schema files live in the `schemas/` directory.
-Runtime validation typically uses copies in `app/schemas/`.
+Runtime validation typically uses copies in `axis_core/schemas/`.
 
 All Attestation-related flows are aligned on `schema_version: "1.0"`.
 
@@ -81,7 +81,7 @@ issued_at (string, required) — RFC3339/ISO 8601 timestamp of when the oracle i
 
 oracle_signature (string, required) — Oracle’s signature over the attestation content (opaque for the schema).
 
-This document is what app.onchain_bridge.build_attestation_params() consumes.
+This document is what `axis_core.onchain_bridge.build_attestation_params()` consumes.
 
 2. Oracle attest request (schemas/oracle_attest_request.schema.json)
 Purpose
@@ -198,8 +198,8 @@ an array of proofs.
 
 Reference example lives in device-record-example.json.
 
-6. Runtime schemas (app/schemas/*.json)
-The app/schemas/ directory contains runtime copies of the schemas used for:
+6. Runtime schemas (axis_core/schemas/*.json)
+The axis_core/schemas/ directory contains runtime copies of the schemas used for:
 
 validating incoming HTTP requests,
 
@@ -209,8 +209,8 @@ They should stay in sync with the reference schemas in schemas/.
 
 Key files:
 
-app/schemas/attestation.schema.json
+axis_core/schemas/attestation.schema.json
 
-app/schemas/oracle_attest_request.schema.json
+axis_core/schemas/oracle_attest_request.schema.json
 
 The demo scripts (scripts/*.py, onchain/scripts/*.py) use these schemas to validate that everything they send/build is consistent with schema_version: "1.0" and the on-chain bridge expectations.

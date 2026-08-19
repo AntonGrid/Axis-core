@@ -1,38 +1,45 @@
 # Axis Core
 
-**Axis Core** is the **universal reference implementation** of the [Axis Protocol](https://github.com/AntonGrid/Axis-protocol) — an open, implementation-independent standard for establishing cryptographically verifiable trust between physical infrastructure and distributed digital systems.
+**Axis Core** is the **universal reference implementation** of the [Axis Protocol](https://github.com/AntonGrid/Axis-protocol) — an open, implementation-independent standard for establishing cryptographically verifiable trust between physical devices and digital systems.
 
 This repository contains the **platform-agnostic** executable parts of the Axis stack:
 
-- **Core services** — Policy Engine, Registry, Oracle logic
-- **Client SDKs** — libraries for interacting with the protocol
-- **Schemas & validation** — canonical data models and JSON Schemas
-- **Developer tooling** — scripts, tests, and examples
+- **Core services** — Provisioning, Device Registry, Oracle (attestation decision) logic
+- **Manifest Registry** — a reference service for signed device manifests and Merkle snapshots
+- **Schemas & validation** — canonical JSON Schemas and runtime validation
+- **Developer tooling** — demo scripts, tests, and examples
 
-> **Note:** This is the **universal** implementation. Blockchain-specific bindings (e.g., Solana, EVM) live in separate repositories or profiles (like [ENRG](https://github.com/AntonGrid/ENRG)).
+> **Note:** This is the **universal** implementation. Blockchain-specific bindings (e.g., Solana, EVM) and domain-specific applications (e.g., energy tokenization) live in separate repositories and profiles — see [ENRG](https://github.com/AntonGrid/ENRG) as one example of a domain profile.
 
 ---
 
 ## Repository Structure
-Axis-core/
-├── app/ # Backend services (FastAPI)
-│ ├── api/ # REST API endpoints
-│ ├── services/ # Business logic (Provisioning, Registry, Oracle)
-│ └── schemas/ # Runtime JSON Schemas
-├── oracle/ # Oracle service (verification, aggregation)
-├── schemas/ # Canonical JSON Schemas (Attestation, Device, etc.)
-├── scripts/ # Helper scripts (demos, utilities)
-├── tests/ # Integration and unit tests
-├── docs/ # Implementation-specific documentation
-├── adr/ # Architecture Decision Records (implementation-level)
-├── README.md # This file
-├── CONTRIBUTING.md # Contributing guidelines
-├── SECURITY.md # Security policy
-├── CODE_OF_CONDUCT.md # Code of conduct
-├── LICENSE # Apache 2.0
-└── requirements.txt # Python dependencies
 
-text
+```text
+Axis-core/
+├── axis_core/              # Python package (FastAPI backend)
+│   ├── api/                # REST API endpoints (provisioning, registry, oracle)
+│   ├── services/           # Business logic (Provisioning, Registry)
+│   ├── schemas/            # Runtime JSON Schemas (validated with jsonschema)
+│   ├── main.py             # FastAPI application entry point
+│   ├── onchain_bridge.py   # Attestation → on-chain parameter mapping (chain-agnostic)
+│   ├── oracle_storage.py   # In-memory oracle storage
+│   ├── schema_utils.py     # JSON Schema loading / validation helpers
+│   └── schemas_loader.py   # Attestation schema loader
+├── schemas/                # Canonical JSON Schemas (reference copies)
+├── oracle/
+│   └── registry/           # Manifest Registry (Node.js / Express)
+├── scripts/                # Demo and utility scripts
+├── tests/                  # pytest test suite
+├── docs/                   # Implementation-specific documentation
+├── adr/                    # Implementation-level ADRs
+├── openapi.yaml            # OpenAPI description of the public API
+├── API.md                  # API overview
+├── SCHEMAS.md              # JSON Schema reference
+├── ROADMAP.md              # Roadmap
+├── LICENSE                 # Apache 2.0
+└── requirements.txt        # Python dependencies
+```
 
 ---
 
@@ -41,62 +48,124 @@ text
 ### Prerequisites
 
 - Python 3.10+
-- [FastAPI](https://fastapi.tiangolo.com/) (installed via `requirements.txt`)
-- [Node.js](https://nodejs.org/) (for the Oracle service)
+- Node.js 18+ (for the Manifest Registry)
 
-### Clone and Install
+### Install
 
 ```bash
 git clone https://github.com/AntonGrid/Axis-core.git
 cd Axis-core
 
-# Install Python dependencies
+# Python (create and use a virtual environment)
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# (Optional) Install Oracle dependencies
-cd oracle && npm install
-Run the Backend
-bash
-uvicorn app.main:app --reload --port 8000
-Run Tests
-bash
+# (Optional) Manifest Registry
+cd oracle/registry && npm install && cd ../..
+```
+
+### Run the backend
+
+```bash
+uvicorn axis_core.main:app --reload --port 8000
+```
+
+### Run the Manifest Registry (optional)
+
+```bash
+cd oracle/registry
+REGISTRY_ADMIN_KEY=secure-key node server.js
+```
+
+---
+
+## Tests
+
+```bash
 # Python tests
-pytest
+pytest -q
 
-# Oracle tests
-cd oracle && npm test
-Relationship with Other Repositories
-Axis-protocol — canonical protocol specification (rules, model, wire format).
-This is the "source of truth" for the protocol.
+# Manifest Registry tests
+cd oracle/registry && npm test
 
-Axis-core (this repository) — universal reference implementation of the protocol.
+# Or run everything from the repo root
+./run-tests.sh
+```
 
-ENRG — domain-specific application (energy tokenization) with a Solana binding.
-ENRG is one example of how Axis Core can be extended for a specific domain and blockchain.
+---
 
-Architecture
+## Quick Start
+
+1. Start the backend (see above) and check health:
+
+   ```bash
+   curl http://localhost:8000/health
+   # => {"status": "ok"}
+   ```
+
+2. Register a device:
+
+   ```bash
+   curl -X POST http://localhost:8000/provisioning/register \
+     -H 'Content-Type: application/json' \
+     -d '{"public_key": "test-public-key-1"}'
+   ```
+
+3. Submit a device proof to the oracle:
+
+   ```bash
+   curl -X POST http://localhost:8000/oracle/attest \
+     -H 'Content-Type: application/json' \
+     -d '{"device_id": "dev_9e9c644e1580a83b", "nonce": "nonce123456", "timestamp": "2026-07-25T19:05:00Z", "algo": "mock", "payload": {"max_power_kw": 2.5}, "signature": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}'
+   ```
+
+4. Explore the full attestation → on-chain mapping demos:
+
+   ```bash
+   python scripts/demo_onchain_bridge.py            # from attestation-example.json
+   python scripts/send_attestation_onchain.py        # JSON → calldata
+   python scripts/full_oracle_onchain_calldata_demo.py   # live /oracle/attest → calldata
+   ```
+
+See [README_demo.md](./README_demo.md), [API.md](./API.md), and [SCHEMAS.md](./SCHEMAS.md) for details.
+
+---
+
+## Relationship with Other Repositories
+
+- **Axis-protocol** — canonical protocol specification (trust model, wire format, validation, lifecycle). This is the *source of truth* for the protocol.
+- **Axis-core** (this repository) — universal reference implementation of the protocol.
+- **ENRG** — a domain-specific application (energy) with a blockchain binding; an example of how Axis Core can be extended for a specific domain.
+
+---
+
+## Architecture
+
 Axis Core follows the same architectural principles as the Axis Protocol:
 
-Open Standard — anyone can implement, modify, and extend.
+- **Open Standard** — anyone can implement, modify, and extend.
+- **Domain-Agnostic** — no assumptions about energy, supply chain, finance, etc.
+- **Infrastructure-Agnostic** — no dependency on a specific blockchain or runtime.
+- **Trust Minimization** — cryptographic verification replaces blind trust.
+- **Separation of Concerns** — each component has a single, well-defined responsibility.
+- **Key Never Leaves the Device** — the core only verifies proofs; it never holds private keys.
 
-Domain-Agnostic — no assumptions about energy, supply chain, finance, etc.
+For a deeper dive, read the [Architecture Decision Records](https://github.com/AntonGrid/Axis-protocol/tree/main/adr) and the [Axis Protocol Specification](https://github.com/AntonGrid/Axis-protocol).
 
-Infrastructure-Agnostic — no dependency on a specific blockchain or runtime.
+---
 
-Trust Minimization — cryptographic verification replaces blind trust.
+## Contributing
 
-Separation of Concerns — each component has a single, well-defined responsibility.
-
-For a deeper dive, read the Architecture Decision Records (ADR) and the Axis Protocol Specification.
-
-Contributing
 We welcome contributions! Please read:
 
-CONTRIBUTING.md — guidelines for PRs and coding standards
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — guidelines for PRs and coding standards
+- [SECURITY.md](./SECURITY.md) — for reporting security issues
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) — community standards
 
-SECURITY.md — for reporting security issues
+---
 
-CODE_OF_CONDUCT.md — community standards
+## License
 
-License
 Apache 2.0 © 2026 Anton Gulda
+

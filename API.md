@@ -5,7 +5,7 @@ The goal is to provide a minimal, consistent, and schema-aligned description
 of the endpoints that participate in the attestation → on-chain flow.
 
 All request/response payloads are JSON and are validated against the JSON Schemas
-in `app/schemas/` (runtime) and `schemas/` (reference copies).
+in `axis_core/schemas/` (runtime) and `schemas/` (reference copies).
 
 Base URL (default):
 
@@ -40,7 +40,7 @@ Evaluate whether a given device is allowed to operate under a requested configur
 
 Request body
 
-Validated by app/schemas/oracle_attest_request.schema.json.
+Validated by axis_core/schemas/oracle_attest_request.schema.json.
 
 Typical example:
 
@@ -130,7 +130,7 @@ The backend does not necessarily expose a /attestation HTTP endpoint; instead, i
 
 Local utilities — build a full Attestation document from oracle responses.
 
-app.onchain_bridge.build_attestation_params(attestation) — converts a JSON Attestation into on-chain parameters suitable for a Solidity function:
+axis_core.onchain_bridge.build_attestation_params(attestation) — converts a JSON Attestation into on-chain parameters suitable for a Solidity function:
 
 solidity
 function submitAttestation(
@@ -140,7 +140,7 @@ function submitAttestation(
   uint64 maxPowerW,
   uint64 issuedAt
 )
-The demo scripts in scripts/ and onchain/scripts/ illustrate how to go from:
+The demo scripts in `scripts/` illustrate how to go from:
 
 Raw oracle response → full Attestation (schema_version: "1.0").
 
