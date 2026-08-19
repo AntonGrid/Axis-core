@@ -1,3 +1,0 @@
-axis_core
-oracle
-sdk
