@@ -7,15 +7,15 @@
 ## Main Components
 
 1. **Backend API (FastAPI)**  
-   - Folder: `app/`  
-   - Entry point: `app/main.py`  
+   - Folder: `axis_core/`  
+   - Entry point: `axis_core/main.py`  
    - Main routes:
      - `/provisioning/...` — initial device attestation (`DeviceProof`).
      - `/registry/...` — device registry and related entities.
      - `/oracle/...` — oracle attestation workflows.
 
 2. **Oracle Attestation**
-   - Module: `app/api/oracle.py`
+   - Module: `axis_core/api/oracle.py`
    - Endpoint: `POST /oracle/attest`
    - Works in two modes:
 
@@ -46,7 +46,7 @@
         }
         ```
 
-   - In-memory storage: dictionary `_ATTESTATIONS` inside `app/api/oracle.py`.
+   - In-memory storage: dictionary `_ATTESTATIONS` inside `axis_core/api/oracle.py`.
 
 3. **JSON Schemas and Validation**
    - Folder: `schemas/`
@@ -56,11 +56,11 @@
      - `device_record.schema.json`
      - `oracle_attest_request.schema.json`
    - Utilities:
-     - `app/schema_utils.py` — loading and caching validators.
-     - `app/schemas_loader.py` — helper functions for working with schemas.
+     - `axis_core/schema_utils.py` — loading and caching validators.
+     - `axis_core/schemas_loader.py` — helper functions for working with schemas.
 
 4. **On-chain Bridge (Python → Solidity)**
-   - Module: `app/onchain_bridge.py`
+   - Module: `axis_core/onchain_bridge.py`
    - Core function: `build_attestation_params(attestation: dict) -> OnchainAttestationParams`
    - Structure `OnchainAttestationParams`:
      ```python

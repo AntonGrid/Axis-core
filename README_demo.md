@@ -42,7 +42,7 @@ The key object is the **Attestation** with:
 From the repo root:
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+uvicorn axis_core.main:app --reload --port 8000
 Check that it is up:
 
 bash
@@ -111,7 +111,7 @@ Load the Attestation JSON.
 
 Normalize it for schema_version: "1.0" (if missing, it is added).
 
-Call app.onchain_bridge.build_attestation_params(...).
+Call axis_core.onchain_bridge.build_attestation_params(...).
 
 Print on-chain parameters and ABI-encoded calldata for submitAttestation(...).
 
@@ -121,7 +121,7 @@ The script does not send any transaction — it only prints data.
 The demo scripts are chain-agnostic: they do not know about RPC URLs, chain IDs or contract addresses. To use them for mainnet integration:
 
 Step 1 — Agree on the Attestation format (off-chain)
-Use SCHEMAS.md and app/schemas/attestation.schema.json as the source of truth.
+Use SCHEMAS.md and axis_core/schemas/attestation.schema.json as the source of truth.
 
 Pin schema_version: "1.0" for the integration.
 
@@ -172,7 +172,7 @@ chainId, gas, fees = according to your mainnet setup.
 Reuse the Python function:
 
 python
-from app.onchain_bridge import build_attestation_params
+from axis_core.onchain_bridge import build_attestation_params
 Or reimplement the same logic in your language of choice:
 
 attestationId and deviceId are hashed to bytes32,
@@ -233,7 +233,7 @@ Online: via ENRG /oracle/attest endpoint.
 Offline: from your own storage / another system, already matching the schema.
 
 Validate Attestations (optional but recommended)
-Use SCHEMAS.md and app/schemas/attestation.schema.json.
+Use SCHEMAS.md and axis_core/schemas/attestation.schema.json.
 
 Optionally validate locally using jsonschema.
 
@@ -241,7 +241,7 @@ Run the local demo once
 Start the backend:
 
 bash
-uvicorn app.main:app --reload --port 8000
+uvicorn axis_core.main:app --reload --port 8000
 Run the happy-path demo:
 
 bash
@@ -268,7 +268,7 @@ Take the printed calldata and plug it into your transaction builder.
 
 Mode B — JSON → ENRG bridge logic → your contract binding
 
-Reuse app.onchain_bridge.build_attestation_params(...) in your backend or reimplement its logic in your language.
+Reuse axis_core.onchain_bridge.build_attestation_params(...) in your backend or reimplement its logic in your language.
 
 Call your contract binding's submitAttestation(...) with the derived parameters.
 
