@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://enrg.energy/schemas/oracle_attest_request.schema.json",
+  "$id": "https://axisprotocol.org/schemas/oracle_attest_request.schema.json",
   "title": "Oracle Attest Request",
   "description": "Request payload sent by devices (or demos) to the oracle /oracle/attest endpoint.",
   "type": "object",
@@ -9,7 +9,7 @@
     "device_id": {
       "type": "string",
       "minLength": 1,
-      "description": "Unique device identifier used by ENRG."
+      "description": "Unique device identifier."
     },
     "nonce": {
       "type": "string",

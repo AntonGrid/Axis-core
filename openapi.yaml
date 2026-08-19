@@ -2,6 +2,9 @@ openapi: 3.0.3
 info:
   title: Axis Core API
   version: "0.1.0"
+  description: |
+    Reference implementation API of the Axis Protocol. Provides device
+    provisioning, the device registry, and oracle attestation decisions.
 
 servers:
   - url: http://localhost:8000
@@ -16,11 +19,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
+                $ref: '#/components/schemas/HealthResponse'
 
   /provisioning/register:
     post:
@@ -30,40 +29,76 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - public_key
-              properties:
-                public_key:
-                  type: string
-                  description: Device public key (e.g., Ed25519)
+              $ref: '#/components/schemas/ProvisioningRequest'
       responses:
         '200':
           description: Device successfully registered
           content:
             application/json:
               schema:
+                $ref: '#/components/schemas/ProvisioningResponse'
+        '400':
+          description: public_key is required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: public_key is required
+
+  /provisioning/attest:
+    post:
+      summary: Submit a device proof for provisioning
+      description: |
+        Validates a DeviceProof against device_proof.schema.json and returns a
+        simple decision. The device must be registered first.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceProof'
+      responses:
+        '200':
+          description: Proof accepted and decision returned
+          content:
+            application/json:
+              schema:
                 type: object
                 required:
+                  - status
                   - device_id
-                  - manifest_ref
-                  - bootstrap_policy
+                  - decision
                 properties:
+                  status:
+                    type: string
+                    example: ok
                   device_id:
                     type: string
-                    description: Deterministic device identifier
                     example: dev_9e9c644e1580a83b
-                  manifest_ref:
-                    type: string
-                    description: Reference to DeviceManifest
-                    example: manifest:v0-placeholder
-                  bootstrap_policy:
+                  decision:
+                    $ref: '#/components/schemas/Decision'
+        '400':
+          description: Invalid DeviceProof or device not registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
                     type: object
-                    description: Initial policy assigned to the device
-                    additionalProperties: true
-                    example:
-                      allowed: true
-                      trust_level: basic
+                    properties:
+                      message:
+                        type: string
+                        example: Invalid DeviceProof
+                      error:
+                        type: string
+                      path:
+                        type: array
+                        items:
+                          type: string
 
   /registry/devices/{device_id}:
     get:
@@ -93,66 +128,198 @@ paths:
                     type: string
                     example: Device not found
 
-  /provisioning/attest:
+  /oracle/attest:
     post:
-      summary: Submit device attestation proof
+      summary: Oracle attestation decision
+      description: |
+        Two modes:
+        1. Legacy: a full Attestation document is validated, stored, and a
+           summary is returned.
+        2. New: an oracle_attest_request is validated, a decision is computed
+           by the mock policy engine, and the decision is returned.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DeviceProof'
+              oneOf:
+                - $ref: '#/components/schemas/Attestation'
+                - $ref: '#/components/schemas/OracleAttestRequest'
       responses:
         '200':
-          description: Attestation accepted and decision returned
+          description: Attestation accepted (Mode A) or decision returned (Mode B)
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - status
-                  - device_id
-                  - decision
-                properties:
-                  status:
-                    type: string
-                    example: ok
-                  device_id:
-                    type: string
-                    example: dev_9e9c644e1580a83b
-                  decision:
-                    type: object
-                    properties:
-                      allowed:
-                        type: boolean
-                        example: true
-                      reason:
-                        type: string
-                        example: mock-allowed
+                oneOf:
+                  - $ref: '#/components/schemas/AttestationSummary'
+                  - $ref: '#/components/schemas/OracleDecision'
         '400':
-          description: Invalid DeviceProof
+          description: Validation error
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   detail:
-                    type: object
-                    properties:
-                      message:
-                        type: string
-                        example: Invalid DeviceProof
-                      error:
-                        type: string
-                        example: "'BAD_ID' does not match '^dev_[0-9a-f]{16}$'"
-                      path:
-                        type: array
-                        items:
-                          type: string
-                        example: ["device_id"]
+                    type: string
+                    example: "Validation error: 'signature' is a required property"
+
+  /oracle/attestations:
+    get:
+      summary: List stored attestations (paginated)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Paginated list of attestation summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttestationList'
+
+  /oracle/attestations/{attestation_id}:
+    get:
+      summary: Get a specific attestation by ID
+      parameters:
+        - name: attestation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Full attestation document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attestation'
+        '404':
+          description: Attestation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Attestation not found
+
+  /oracle/requests:
+    get:
+      summary: List stored oracle requests (paginated)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Paginated list of request summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestList'
+
+  /oracle/requests/{request_id}:
+    get:
+      summary: Get a specific oracle request by ID
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stored oracle request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request_id:
+                    type: string
+                  attestation_id:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+                  request:
+                    $ref: '#/components/schemas/OracleAttestRequest'
+        '404':
+          description: Request not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Request not found
 
 components:
   schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: ok
+
+    ProvisioningRequest:
+      type: object
+      required:
+        - public_key
+      properties:
+        public_key:
+          type: string
+          description: Device public key (e.g., Ed25519)
+        manifest_ref:
+          type: string
+          description: Optional reference to a DeviceManifest
+          example: manifest:v0-placeholder
+
+    ProvisioningResponse:
+      type: object
+      required:
+        - device_id
+        - manifest_ref
+        - bootstrap_policy
+      properties:
+        device_id:
+          type: string
+          description: Deterministic device identifier
+          example: dev_9e9c644e1580a83b
+        manifest_ref:
+          type: string
+          description: Reference to DeviceManifest
+          example: manifest:v0-placeholder
+        bootstrap_policy:
+          type: object
+          description: Initial policy assigned to the device
+          additionalProperties: true
+          example:
+            allowed: true
+            max_power_kw: 3.5
+
     DeviceRecord:
       type: object
       additionalProperties: false
@@ -161,9 +328,6 @@ components:
         - public_key
         - lifecycle_state
         - manifest_ref
-        - created_at
-        - updated_at
-        - labels
       properties:
         device_id:
           type: string
@@ -194,24 +358,12 @@ components:
         manifest_ref:
           type: string
           example: manifest:v0-placeholder
-        created_at:
-          type: string
-          format: date-time
-          example: "2026-07-25T18:40:39.728366+00:00"
-        updated_at:
-          type: string
-          format: date-time
-          example: "2026-07-25T18:40:39.728375+00:00"
-        labels:
-          type: object
-          additionalProperties:
-            type: string
-          example: {}
 
     DeviceProof:
       type: object
       additionalProperties: false
       required:
+        - schema_version
         - device_id
         - nonce
         - timestamp
@@ -219,6 +371,10 @@ components:
         - payload
         - signature
       properties:
+        schema_version:
+          type: string
+          enum:
+            - "1.0"
         device_id:
           type: string
           pattern: "^dev_[0-9a-f]{16}$"
@@ -242,9 +398,235 @@ components:
           description: Opaque payload signed by the device
           additionalProperties: true
           example:
-            event_type: "production"
+            event_type: production
             value: 1000
         signature:
           type: string
           minLength: 32
           example: deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+
+    Decision:
+      type: object
+      required:
+        - allowed
+        - reason
+      properties:
+        allowed:
+          type: boolean
+          example: true
+        reason:
+          type: string
+          example: mock-allowed
+        max_power_kw:
+          type: number
+          minimum: 0
+          example: 2.5
+        limit_kw:
+          type: number
+          description: Present on deny decisions
+          example: 5.0
+
+    OracleAttestRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - device_id
+        - nonce
+        - timestamp
+        - algo
+        - payload
+        - signature
+      properties:
+        device_id:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 UTC timestamp with trailing Z
+          example: "2026-07-25T19:05:00Z"
+        algo:
+          type: string
+          minLength: 1
+          example: mock
+        payload:
+          type: object
+          required:
+            - max_power_kw
+          properties:
+            max_power_kw:
+              type: number
+              minimum: 0
+              example: 2.5
+        signature:
+          type: string
+          minLength: 1
+
+    Attestation:
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - attestation_id
+        - device_id
+        - proof
+        - decision
+        - oracle_id
+        - issued_at
+        - oracle_signature
+      properties:
+        schema_version:
+          type: string
+          const: "1.0"
+        attestation_id:
+          type: string
+          minLength: 1
+        device_id:
+          type: string
+          minLength: 1
+        proof:
+          type: object
+          additionalProperties: false
+          required:
+            - device_id
+            - nonce
+            - timestamp
+            - algo
+            - payload
+            - signature
+          properties:
+            device_id:
+              type: string
+            nonce:
+              type: string
+            timestamp:
+              type: string
+              format: date-time
+            algo:
+              type: string
+            payload:
+              type: object
+              required:
+                - max_power_kw
+              properties:
+                max_power_kw:
+                  type: number
+                  minimum: 0
+            signature:
+              type: string
+        decision:
+          type: object
+          additionalProperties: false
+          required:
+            - allowed
+            - reason
+            - max_power_kw
+          properties:
+            allowed:
+              type: boolean
+            reason:
+              type: string
+            max_power_kw:
+              type: number
+              minimum: 0
+        oracle_id:
+          type: string
+          minLength: 1
+        issued_at:
+          type: string
+          format: date-time
+        oracle_signature:
+          type: string
+          minLength: 1
+
+    AttestationSummary:
+      type: object
+      required:
+        - status
+        - attestation_id
+        - device_id
+      properties:
+        status:
+          type: string
+          example: received
+        attestation_id:
+          type: string
+        device_id:
+          type: string
+        oracle_id:
+          type: string
+
+    OracleDecision:
+      type: object
+      required:
+        - device_id
+        - attestation_id
+        - decision
+      properties:
+        device_id:
+          type: string
+        attestation_id:
+          type: string
+        decision:
+          $ref: '#/components/schemas/Decision'
+        oracle_id:
+          type: string
+
+    AttestationList:
+      type: object
+      required:
+        - total
+        - limit
+        - offset
+        - attestations
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        attestations:
+          type: array
+          items:
+            type: object
+            properties:
+              attestation_id:
+                type: string
+              device_id:
+                type: string
+              issued_at:
+                type: string
+                format: date-time
+
+    RequestList:
+      type: object
+      required:
+        - total
+        - limit
+        - offset
+        - requests
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        requests:
+          type: array
+          items:
+            type: object
+            properties:
+              request_id:
+                type: string
+              attestation_id:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              device_id:
+                type: string

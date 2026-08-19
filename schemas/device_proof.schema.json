@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://enrg.local/schemas/device_proof.schema.json",
+  "$id": "https://axisprotocol.org/schemas/device_proof.schema.json",
   "title": "DeviceProof",
   "type": "object",
   "additionalProperties": false,

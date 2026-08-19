@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://enrg.energy/schemas/attestation.schema.json",
-  "title": "ENRG Attestation",
+  "$id": "https://axisprotocol.org/schemas/attestation.schema.json",
+  "title": "Attestation",
   "description": "Final attestation document produced by the oracle and consumed by on-chain bridge.",
   "type": "object",
   "additionalProperties": false,
@@ -29,7 +29,7 @@
     "device_id": {
       "type": "string",
       "minLength": 1,
-      "description": "Unique device identifier used by ENRG."
+      "description": "Unique device identifier."
     },
     "proof": {
       "type": "object",

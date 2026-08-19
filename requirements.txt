@@ -6,4 +6,5 @@ httpx
 pycryptodome
 eth-utils
 eth-abi
+PyYAML
 pytest
