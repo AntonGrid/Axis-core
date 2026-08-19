@@ -135,8 +135,14 @@ paths:
         Two modes:
         1. Legacy: a full Attestation document is validated, stored, and a
            summary is returned.
-        2. New: an oracle_attest_request is validated, a decision is computed
-           by the mock policy engine, and the decision is returned.
+        2. New: an oracle_attest_request is validated, the device Ed25519
+           signature is verified against the registered public key, and a
+           decision is computed by the (mock) policy engine.
+
+        Signature verification (new mode): the device must be registered, and
+        the Base64-encoded Ed25519 signature must be valid over the canonical
+        message (see docs/conformance.md). The dev-only `mock` algorithm is
+        accepted only when `AXIS_ALLOW_MOCK` is set.
       requestBody:
         required: true
         content:
@@ -416,14 +422,18 @@ components:
           example: true
         reason:
           type: string
-          example: mock-allowed
+          description: |
+            Decision reason: `ok`, `device_not_registered`, `signature_invalid`,
+            `unsupported_algo`, `mock_disabled`, `max_power_exceeded`,
+            `below_minimum_power`.
+          example: ok
         max_power_kw:
           type: number
           minimum: 0
           example: 2.5
         limit_kw:
           type: number
-          description: Present on deny decisions
+          description: Present on policy denials
           example: 5.0
 
     OracleAttestRequest:
@@ -451,7 +461,10 @@ components:
         algo:
           type: string
           minLength: 1
-          example: mock
+          description: |
+            Signature algorithm: `ed25519` (required by default) or `mock`
+            (dev-only, requires AXIS_ALLOW_MOCK).
+          example: ed25519
         payload:
           type: object
           required:
@@ -464,6 +477,7 @@ components:
         signature:
           type: string
           minLength: 1
+          description: Base64-encoded Ed25519 signature over the canonical message
 
     Attestation:
       type: object

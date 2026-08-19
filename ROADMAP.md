@@ -26,14 +26,14 @@ The long-term goal is to establish Axis Core as the foundational runtime for any
 
 ## Phase 2 — Services & SDK 🚧
 
-- Device Registry service
-- Provisioning service
-- Policy Engine implementation
-- Oracle / Verifier implementation
-- SDK for Python
-- SDK for TypeScript
-- REST API
-- Developer documentation
+- Device Registry service ✅ (provisioning → registry reference flow)
+- Provisioning service ✅ (register + attest reference flow)
+- Policy Engine implementation 🔶 (mock rules active: `max_power_kw` allow/deny)
+- Oracle / Verifier implementation ✅ (Ed25519 device signature verification)
+- SDK for Python ⬜
+- SDK for TypeScript ⬜
+- REST API ✅ (9 endpoints, documented in `openapi.yaml`)
+- Developer documentation ✅ (API.md, SCHEMAS.md, docs/conformance.md)
 
 **Status:** In Progress
 

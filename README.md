@@ -112,13 +112,17 @@ cd oracle/registry && npm test
      -d '{"public_key": "test-public-key-1"}'
    ```
 
-3. Submit a device proof to the oracle:
+3. Submit a signed device proof to the oracle (real Ed25519 flow via the demo script —
+   it generates a key, registers the device, and signs the proof):
 
    ```bash
-   curl -X POST http://localhost:8000/oracle/attest \
-     -H 'Content-Type: application/json' \
-     -d '{"device_id": "dev_9e9c644e1580a83b", "nonce": "nonce123456", "timestamp": "2026-07-25T19:05:00Z", "algo": "mock", "payload": {"max_power_kw": 2.5}, "signature": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}'
+   python scripts/full_oracle_onchain_demo.py
    ```
+
+   > **Note:** the oracle now verifies Ed25519 signatures. A device must be
+   > registered first, and `proof.signature` must be valid over the canonical
+   > message (see [docs/conformance.md](./docs/conformance.md)). The legacy
+   > `mock` algorithm is a dev-only mode enabled with `AXIS_ALLOW_MOCK=1`.
 
 4. Explore the full attestation → on-chain mapping demos:
 
@@ -165,11 +169,13 @@ The conformance tests in `tests/test_conformance.py` verify:
 - the canonical schemas in `schemas/` stay in sync with the runtime schemas in `axis_core/schemas/`;
 - schema field names follow the protocol glossary;
 - the attestation examples (`attestation-example.json`, `attestation-example-deny.json`)
-  are schema-valid and round-trip through the oracle API (allowed and denied scenarios).
+  are schema-valid and round-trip through the oracle API (allowed and denied scenarios);
+- the oracle verifies real Ed25519 device signatures (registered device, canonical
+  signed message) and rejects unregistered devices and invalid signatures.
 
-Known deviations and gaps (license metadata, manifest vs ADR-0004, lifecycle
-states, wire format, mock policy engine) are **documented, not silently changed** —
-see [docs/conformance.md](./docs/conformance.md).
+Known deviations and gaps (manifest vs ADR-0004, lifecycle states, wire format,
+mock policy engine) are **documented, not silently changed** — see
+[docs/conformance.md](./docs/conformance.md).
 
 ---
 

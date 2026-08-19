@@ -1,138 +1,229 @@
 # Axis Core — API Overview
 
 This document describes the public HTTP API exposed by the Axis Core backend.
-The goal is to provide a minimal, consistent, and schema-aligned description
-of the endpoints that participate in the attestation → on-chain flow.
+It is a minimal, consistent, and schema-aligned description of the endpoints
+that participate in the provisioning → attestation → on-chain flow.
 
 All request/response payloads are JSON and are validated against the JSON Schemas
 in `axis_core/schemas/` (runtime) and `schemas/` (reference copies).
 
-Base URL (default):
-
-- `http://localhost:8000`
+Base URL (default): `http://localhost:8000`
 
 ---
 
 ## 1. Health
 
-**Endpoint**
+**Endpoint:** `GET /health`
 
-- `GET /health`
+**Description:** Simple liveness probe for the backend.
 
-**Description**
-
-Simple liveness probe for the backend.
-
-**Response**
+**Response:**
 
 ```json
 {
   "status": "ok"
 }
-2. Oracle attest
-Endpoint
+```
 
-POST /oracle/attest
+---
 
-Description
+## 2. Provisioning
 
-Evaluate whether a given device is allowed to operate under a requested configuration (e.g. requested power). This is the main entry point for the oracle decision.
+### 2.1. `POST /provisioning/register`
 
-Request body
+Register a new device. Accepts the device public key (Base64-encoded Ed25519)
+and an optional manifest reference, and returns a deterministic `device_id`,
+the assigned `manifest_ref`, and the bootstrap policy.
 
-Validated by axis_core/schemas/oracle_attest_request.schema.json.
+**Request:**
 
-Typical example:
-
-json
+```json
 {
-  "device_id": "dev_demo_full_cycle",
-  "nonce": "demo_nonce_123",
-  "max_power_kw": 3.3
+  "public_key": "<base64-ed25519-public-key>",
+  "manifest_ref": "manifest:v0-placeholder"
 }
-Field summary:
+```
 
-device_id (string, required) — Unique identifier of the device, must be consistent across API calls and on-chain mapping.
+**Response (200):**
 
-nonce (string, required) — Client-provided nonce for replay protection / correlation. In demos this is a human-readable string.
-
-max_power_kw (number, required) — Requested maximum power in kW.
-
-Response body
-
-Simplified structure (validated by the same-family schema):
-
-json
+```json
 {
-  "device_id": "dev_demo_full_cycle",
-  "attestation_id": "661a8435-b9ec-4722-8654-c92ef0e172e5",
+  "device_id": "dev_9e9c644e1580a83b",
+  "manifest_ref": "manifest:v0-placeholder",
+  "bootstrap_policy": {
+    "allowed": true,
+    "max_power_kw": 3.5
+  }
+}
+```
+
+**Error (400):** `public_key` is required.
+
+### 2.2. `POST /provisioning/attest`
+
+Accept a `DeviceProof` (validated against `device_proof.schema.json`) and return
+a simple decision. If the device is not registered, the request is rejected.
+
+**Request:**
+
+```json
+{
+  "schema_version": "1.0",
+  "device_id": "dev_9e9c644e1580a83b",
+  "nonce": "abc12345xyz",
+  "timestamp": "2026-07-25T19:00:00Z",
+  "algo": "mock",
+  "payload": { "max_power_kw": 2.5 },
+  "signature": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "ok",
+  "device_id": "dev_9e9c644e1580a83b",
+  "decision": {
+    "allowed": true,
+    "reason": "mock-allowed"
+  }
+}
+```
+
+**Error (400):** invalid `DeviceProof` or device not registered.
+
+---
+
+## 3. Device Registry
+
+### 3.1. `GET /registry/devices/{device_id}`
+
+Retrieve a device record by its ID.
+
+**Response (200):**
+
+```json
+{
+  "device_id": "dev_9e9c644e1580a83b",
+  "public_key": "<base64-ed25519-public-key>",
+  "owner": null,
+  "lifecycle_state": "provisioned",
+  "firmware_version": null,
+  "manifest_ref": "manifest:v0-placeholder"
+}
+```
+
+**Error (404):** device not found.
+
+---
+
+## 4. Oracle
+
+### 4.1. `POST /oracle/attest`
+
+The oracle endpoint works in two modes.
+
+#### Mode A: Full Attestation (legacy)
+
+Accepts a complete Attestation document, validates it against
+`attestation.schema.json`, stores it in memory, and returns a summary.
+
+**Request:**
+
+```json
+{
+  "schema_version": "1.0",
+  "attestation_id": "att_123",
+  "device_id": "dev_9e9c644e1580a83b",
+  "proof": { "...": "..." },
+  "decision": { "allowed": true, "reason": "ok", "max_power_kw": 2.5 },
+  "oracle_id": "oracle_main_1",
+  "issued_at": "2026-07-25T19:05:00Z",
+  "oracle_signature": "..."
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "received",
+  "attestation_id": "att_123",
+  "device_id": "dev_9e9c644e1580a83b",
+  "oracle_id": "oracle_main_1"
+}
+```
+
+**Error (400):** schema validation error (`"Validation error: ..."`).
+
+#### Mode B: Attestation request (new format)
+
+Accepts an `oracle_attest_request` (`device_id`, `nonce`, `timestamp`, `algo`,
+`payload`, `signature`), validates it against `oracle_attest_request.schema.json`,
+**verifies the device Ed25519 signature** against the registered public key, then
+applies the decision logic (a mock policy engine).
+
+**Request:**
+
+```json
+{
+  "device_id": "dev_9e9c644e1580a83b",
+  "nonce": "abc12345xyz",
+  "timestamp": "2026-07-25T19:05:00Z",
+  "algo": "ed25519",
+  "payload": { "max_power_kw": 2.5 },
+  "signature": "<base64-ed25519-signature>"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "device_id": "dev_9e9c644e1580a83b",
+  "attestation_id": "a6ff7c9a-9e75-4f6c-9b18-2cbb2e9b1a77",
   "decision": {
     "allowed": true,
     "reason": "ok",
-    "max_power_kw": 3.3
+    "max_power_kw": 2.5
   },
   "oracle_id": "oracle_main_1"
 }
-For deny cases, the decision may look like:
+```
 
-json
-"decision": {
-  "allowed": false,
-  "reason": "max_power_exceeded",
-  "max_power_kw": 10.0,
-  "limit_kw": 5.0
-}
-Field summary:
+**Decision reasons:** `ok`, `device_not_registered`, `signature_invalid`,
+`unsupported_algo`, `mock_disabled`, `max_power_exceeded`,
+`below_minimum_power` (see `docs/conformance.md`).
 
-device_id (string) – echoed from request.
+**Errors (400):**
 
-attestation_id (string, UUID) – logical identifier of this oracle decision.
+- schema validation error: `"Validation error: ..."`;
+- missing required field: `"Missing required field: 'signature'"`;
+- invalid timestamp: `"timestamp must end with 'Z'"`.
 
-decision (object):
+The `timestamp` must be in ISO 8601 UTC format with a trailing `Z`, for example
+`2026-07-25T19:05:00Z`. The `attestation_id` is generated by the server (UUID).
 
-allowed (boolean) – whether the device is allowed under the requested conditions.
+### 4.2. `GET /oracle/attestations` and `GET /oracle/attestations/{attestation_id}`
 
-reason (string) – short, human-readable explanation.
+List stored attestations (paginated) and retrieve a specific attestation by ID.
 
-max_power_kw (number) – effective max power in kW for this decision.
+### 4.3. `GET /oracle/requests` and `GET /oracle/requests/{request_id}`
 
-limit_kw (number, optional, deny only) – configured limit that was exceeded.
+List stored oracle requests (paginated) and retrieve a specific request by ID.
 
-oracle_id (string, optional) – identifier of the oracle instance.
+---
 
-This response is not yet the final Attestation, but it contains enough information to build one (see attestation.schema.json and demos).
+## 5. Attestation and on-chain bridge
 
-3. Provisioning / bootstrap endpoints
-Note: exact paths and payload details depend on your current implementation. Below is a high-level outline aligned with the JSON schemas.
+The backend exposes building blocks rather than a single `/attestation` endpoint:
 
-These endpoints handle device provisioning and proofs, validated against:
+- `/oracle/attest` — makes a decision (allowed / deny);
+- `axis_core.onchain_bridge.build_attestation_params(attestation)` — converts a JSON
+  Attestation into on-chain parameters suitable for a Solidity function:
 
-schemas/device_manifest.schema.json
-
-schemas/device_proof.schema.json
-
-schemas/device_record.schema.json
-
-Typical roles:
-
-Device Manifest — Static description of device capabilities and identifiers.
-
-Device Proof (bootstrap / provisioning) — Cryptographic material or structured evidence that a device is genuine and bound to a certain identity.
-
-Device Record — Aggregated, persistent record the protocol keeps about a device (manifest + proofs + state).
-
-If you expose HTTP endpoints like /provisioning/manifest, /provisioning/proof, etc., their payloads should follow the above schemas. The detailed field-level specification lives in SCHEMAS.md.
-
-4. Attestation and on-chain bridge
-The backend does not necessarily expose a /attestation HTTP endpoint; instead, it exposes building blocks:
-
-/oracle/attest — makes a decision (allowed / deny).
-
-Local utilities — build a full Attestation document from oracle responses.
-
-axis_core.onchain_bridge.build_attestation_params(attestation) — converts a JSON Attestation into on-chain parameters suitable for a Solidity function:
-
-solidity
+```solidity
 function submitAttestation(
   bytes32 attestationId,
   bytes32 deviceId,
@@ -140,12 +231,13 @@ function submitAttestation(
   uint64 maxPowerW,
   uint64 issuedAt
 )
+```
+
 The demo scripts in `scripts/` illustrate how to go from:
 
-Raw oracle response → full Attestation (schema_version: "1.0").
+- raw oracle response → full Attestation (`schema_version: "1.0"`);
+- Attestation JSON → on-chain parameters;
+- on-chain parameters → ABI-encoded calldata for `submitAttestation(...)`.
 
-Attestation JSON → on-chain parameters.
-
-On-chain parameters → ABI-encoded calldata for submitAttestation(...).
-
-For full details on the Attestation JSON shape, see SCHEMAS.md and schemas/attestation.schema.json.
+For full details on the Attestation JSON shape, see `SCHEMAS.md` and
+`schemas/attestation.schema.json`.
