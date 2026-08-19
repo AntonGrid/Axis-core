@@ -1,0 +1,17 @@
+services:
+  axis-core:
+    build: .
+    image: axis-core:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # Dev-only mock signatures are OFF by default.
+      - AXIS_ALLOW_MOCK=${AXIS_ALLOW_MOCK:-}
+
+  registry:
+    build: ./oracle/registry
+    image: axis-manifest-registry:latest
+    ports:
+      - "4000:4000"
+    environment:
+      - REGISTRY_ADMIN_KEY=${REGISTRY_ADMIN_KEY:-secure-key}

@@ -78,6 +78,19 @@ cd oracle/registry
 REGISTRY_ADMIN_KEY=secure-key node server.js
 ```
 
+### Run with Docker Compose (optional)
+
+The repository ships a `docker-compose.yml` that brings up both services:
+
+```bash
+docker compose up --build
+```
+
+- Axis Core API → http://localhost:8000
+- Manifest Registry → http://localhost:4000
+
+Set `AXIS_ALLOW_MOCK=1` to enable the dev-only mock signature mode.
+
 ---
 
 ## Tests

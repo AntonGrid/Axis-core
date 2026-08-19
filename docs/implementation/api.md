@@ -174,7 +174,8 @@ Accepts a complete Attestation document, validates it against
 
 Accepts an `oracle_attest_request` (`device_id`, `nonce`, `timestamp`, `algo`,
 `payload`, `signature`), validates it against `oracle_attest_request.schema.json`,
-applies the decision logic (a mock Policy Engine), and returns the decision.
+applies the decision logic (a mock Policy Engine) after verifying the device
+Ed25519 signature, and returns the decision.
 
 **Request:**
 

@@ -32,8 +32,11 @@ npm test
 
 The registry will be available at http://localhost:4000.
 
-> A `docker-compose.yml` is not provided yet. To containerize the registry, build the
-> included `Dockerfile`: `docker build -t axis-manifest-registry .`
+> To run the full stack (Axis Core API + Manifest Registry) with Docker Compose,
+> use the `docker-compose.yml` at the repository root:
+> `docker compose up --build`.
+> To containerize the registry alone, build the included `Dockerfile`:
+> `docker build -t axis-manifest-registry ./oracle/registry`.
 
 ## Example requests
 
