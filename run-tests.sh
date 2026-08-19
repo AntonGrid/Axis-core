@@ -17,4 +17,16 @@ fi
 pytest -q
 
 echo
+echo "==> Running Manifest Registry tests (mocha)..."
+cd "$ROOT_DIR/oracle/registry"
+
+if [ ! -d "node_modules" ]; then
+  echo "INFO: node_modules not found, running npm install..."
+  npm install
+fi
+
+npm test
+
+echo
 echo "==> All tests passed."
+

@@ -4,3 +4,6 @@ pydantic
 jsonschema
 httpx
 pycryptodome
+eth-utils
+eth-abi
+pytest
