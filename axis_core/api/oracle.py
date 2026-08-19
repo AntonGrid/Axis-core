@@ -1,12 +1,15 @@
+import os
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from jsonschema import ValidationError
 
 from axis_core.schema_utils import validate_payload
 from axis_core.oracle_storage import _ATTESTATIONS, _REQUESTS
+from axis_core.services.provisioning_service import _DB
+from axis_core.signature_utils import canonical_proof_message, verify_ed25519_signature
 
 router = APIRouter(prefix="/oracle", tags=["oracle"])
 
@@ -29,6 +32,97 @@ def _ensure_iso8601_z(ts: str) -> None:
         raise ValueError(f"Invalid ISO 8601 timestamp: {e!s}") from e
 
 
+def _mock_signatures_enabled() -> bool:
+    """Whether the dev-only ``mock`` algorithm is accepted.
+
+    Enabled via the ``AXIS_ALLOW_MOCK`` environment variable (``1``/``true``/``yes``).
+    By default the oracle REQUIRES real ``ed25519`` signatures.
+    """
+    return os.environ.get("AXIS_ALLOW_MOCK", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
+    """Compute the oracle decision for an attestation request.
+
+    Order of checks:
+      1. algorithm support (``ed25519`` required by default; ``mock`` is a
+         documented dev-only mode);
+      2. device registration (the registry is the source of truth);
+      3. Ed25519 signature verification against the registered public key;
+      4. mock Policy Engine rules on ``max_power_kw``.
+
+    The decision dict always contains ``allowed``, ``reason`` and
+    ``max_power_kw``; a ``limit_kw`` field is added for policy denials.
+    """
+    device_id = request["device_id"]
+    algo = request.get("algo", "ed25519")
+    max_power_kw = request.get("payload", {}).get("max_power_kw", 0.0)
+
+    # 1. Algorithm support
+    if algo == "ed25519":
+        # 2. The device MUST be registered (registry = source of truth).
+        device = _DB.get(device_id)
+        if device is None:
+            return {
+                "allowed": False,
+                "reason": "device_not_registered",
+                "max_power_kw": 0.0,
+            }
+
+        # 3. Verify the device signature over the canonical message.
+        try:
+            signature_valid = verify_ed25519_signature(
+                public_key_b64=device.public_key,
+                message=canonical_proof_message(request),
+                signature_b64=request.get("signature", ""),
+            )
+        except Exception:
+            signature_valid = False
+
+        if not signature_valid:
+            return {
+                "allowed": False,
+                "reason": "signature_invalid",
+                "max_power_kw": 0.0,
+            }
+    elif algo == "mock":
+        if not _mock_signatures_enabled():
+            return {
+                "allowed": False,
+                "reason": "mock_disabled",
+                "max_power_kw": 0.0,
+            }
+    else:
+        return {
+            "allowed": False,
+            "reason": "unsupported_algo",
+            "max_power_kw": 0.0,
+        }
+
+    # 4. Mock Policy Engine
+    if max_power_kw > 5.0:
+        return {
+            "allowed": False,
+            "reason": "max_power_exceeded",
+            "max_power_kw": 5.0,
+            "limit_kw": 5.0,
+        }
+
+    if algo == "mock" and max_power_kw < 0.1:
+        return {
+            "allowed": False,
+            "reason": "below_minimum_power",
+            "max_power_kw": 0.1,
+            "limit_kw": 0.1,
+        }
+
+    return {
+        "allowed": True,
+        "reason": "ok",
+        "max_power_kw": max_power_kw,
+    }
+
+
 def _build_attestation_from_request(request: Dict[str, Any]) -> Dict[str, Any]:
     """
     Builds a full Attestation from an oracle_attest_request.
@@ -36,25 +130,13 @@ def _build_attestation_from_request(request: Dict[str, Any]) -> Dict[str, Any]:
     device_id = request["device_id"]
     nonce = request.get("nonce")
     timestamp = request.get("timestamp")
-    algo = request.get("algo", "mock")
+    algo = request.get("algo", "ed25519")
     max_power_kw = request.get("payload", {}).get("max_power_kw", 0.0)
     signature = request.get("signature")
 
-    # Decision logic (mock Policy Engine)
-    allowed = True
-    reason = "ok"
-    limit_kw = None
-
-    # Simple deny rules
-    if max_power_kw > 5.0:
-        allowed = False
-        reason = "max_power_exceeded"
-        limit_kw = 5.0
-
-    if algo == "mock" and max_power_kw < 0.1:
-        allowed = False
-        reason = "below_minimum_power"
-        limit_kw = 0.1
+    decision = _resolve_decision(request)
+    allowed = decision["allowed"]
+    limit_kw = decision.get("limit_kw")
 
     # Generate attestation
     att_id = str(uuid4())
@@ -72,11 +154,7 @@ def _build_attestation_from_request(request: Dict[str, Any]) -> Dict[str, Any]:
             "payload": {"max_power_kw": max_power_kw},
             "signature": signature or "mock-signature",
         },
-        "decision": {
-            "allowed": allowed,
-            "reason": reason,
-            "max_power_kw": max_power_kw if allowed else (limit_kw or 0.0),
-        },
+        "decision": decision,
         "oracle_id": "oracle_main_1",
         "issued_at": now,
         "oracle_signature": "mock-oracle-signature",

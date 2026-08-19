@@ -7,4 +7,5 @@ pycryptodome
 eth-utils
 eth-abi
 PyYAML
+PyNaCl
 pytest

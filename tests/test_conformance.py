@@ -22,6 +22,9 @@ from fastapi.testclient import TestClient
 from jsonschema import Draft7Validator
 
 from axis_core.main import app
+from axis_core.signature_utils import generate_device_key
+
+from tests.signature_helpers import build_signed_proof, make_registered_device
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 client = TestClient(app)
@@ -135,17 +138,10 @@ def test_attestation_examples_through_oracle_api():
 
 
 def test_oracle_decision_allowed():
-    resp = client.post(
-        "/oracle/attest",
-        json={
-            "device_id": "dev_9e9c644e1580a83b",
-            "nonce": "nonce_allowed_123456",
-            "timestamp": "2026-07-25T19:05:00Z",
-            "algo": "mock",
-            "payload": {"max_power_kw": 2.5},
-            "signature": "deadbeef" * 8,
-        },
-    )
+    key, device_id = make_registered_device(client)
+    proof = build_signed_proof(key, device_id, "nonce_allowed_123456", "2026-07-25T19:05:00Z", 2.5)
+
+    resp = client.post("/oracle/attest", json=proof)
     assert resp.status_code == 200
     decision = resp.json()["decision"]
     assert decision["allowed"] is True
@@ -154,23 +150,53 @@ def test_oracle_decision_allowed():
 
 
 def test_oracle_decision_denied_when_power_exceeds_limit():
-    resp = client.post(
-        "/oracle/attest",
-        json={
-            "device_id": "dev_deny_power_00000000",
-            "nonce": "nonce_denied_123456",
-            "timestamp": "2026-07-25T19:05:00Z",
-            "algo": "mock",
-            "payload": {"max_power_kw": 10.0},
-            "signature": "deadbeef" * 8,
-        },
-    )
+    key, device_id = make_registered_device(client)
+    proof = build_signed_proof(key, device_id, "nonce_denied_123456", "2026-07-25T19:05:00Z", 10.0)
+
+    resp = client.post("/oracle/attest", json=proof)
     assert resp.status_code == 200
     decision = resp.json()["decision"]
     assert decision["allowed"] is False
     assert decision["reason"] == "max_power_exceeded"
     assert decision["max_power_kw"] == 5.0
     assert decision["limit_kw"] == 5.0
+
+
+def test_oracle_rejects_unregistered_device_and_bad_signature():
+    # Unregistered device → denied, no signature check leak.
+    key, _ = make_registered_device(client)
+    proof = build_signed_proof(
+        key, "dev_0123456789abcdef", "nonce_conc_12345", "2026-07-25T19:05:00Z", 2.5
+    )
+    resp = client.post("/oracle/attest", json=proof)
+    assert resp.json()["decision"]["reason"] == "device_not_registered"
+
+    # Registered device, wrong signature → denied.
+    key2, device_id2 = make_registered_device(client)
+    other_key = generate_device_key()
+    proof2 = build_signed_proof(other_key, device_id2, "nonce_conc_23456", "2026-07-25T19:05:00Z", 2.5)
+    resp2 = client.post("/oracle/attest", json=proof2)
+    assert resp2.json()["decision"]["reason"] == "signature_invalid"
+
+
+def test_canonical_proof_message_is_deterministic_and_excludes_signature():
+    from axis_core.signature_utils import canonical_proof_message
+
+    body = {
+        "device_id": "dev_9e9c644e1580a83b",
+        "nonce": "abc12345xyz",
+        "timestamp": "2026-07-25T19:05:00Z",
+        "algo": "ed25519",
+        "payload": {"max_power_kw": 2.5},
+    }
+    with_signature = {**body, "signature": "some-signature"}
+    assert canonical_proof_message(body) == canonical_proof_message(body)
+    assert canonical_proof_message(body) == canonical_proof_message(with_signature)
+    # Canonical JSON: sorted keys, no whitespace.
+    assert canonical_proof_message(body) == (
+        b'{"algo":"ed25519","device_id":"dev_9e9c644e1580a83b","nonce":"abc12345xyz",'
+        b'"payload":{"max_power_kw":2.5},"timestamp":"2026-07-25T19:05:00Z"}'
+    )
 
 
 # ---------------------------------------------------------------------------
