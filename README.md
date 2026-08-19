@@ -1,5 +1,10 @@
 # Axis Core
 
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![CI](https://github.com/AntonGrid/Axis-core/actions/workflows/ci.yml/badge.svg)](https://github.com/AntonGrid/Axis-core/actions)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
+
 **Axis Core** is the **universal reference implementation** of the [Axis Protocol](https://github.com/AntonGrid/Axis-protocol) — an open, implementation-independent standard for establishing cryptographically verifiable trust between physical devices and digital systems.
 
 This repository contains the **platform-agnostic** executable parts of the Axis stack:
