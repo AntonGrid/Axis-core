@@ -86,6 +86,10 @@ The repository ships a `docker-compose.yml` that brings up both services:
 docker compose up --build
 ```
 
+> **Requires Docker Compose v2** (`docker compose`). Verify with
+> `docker compose version` before running. The legacy `docker-compose` (v1)
+> binary is not supported.
+
 - Axis Core API → http://localhost:8000
 - Manifest Registry → http://localhost:4000
 

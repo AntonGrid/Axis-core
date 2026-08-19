@@ -1,3 +1,8 @@
+# Docker Compose stack for Axis Core (reference implementation).
+#
+# NOTE: this file requires Docker Compose v2 (`docker compose`). If the v2 plugin
+# is not installed on your system, run `docker compose version` to confirm, or
+# install Docker Compose v2 before using `docker compose up --build`.
 services:
   axis-core:
     build: .
