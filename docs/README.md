@@ -1,107 +1,54 @@
-# ENRG Documentation
+# Axis Core — Documentation
 
-## Status
+This directory contains implementation-specific documentation for **Axis Core**, the
+universal reference implementation of the Axis Protocol.
 
-Normative
-
----
-
-# Overview
-
-This directory contains the complete documentation of the ENRG Protocol and its reference ecosystem.
-
-Documentation is organized by responsibility to simplify maintenance, navigation, and long-term evolution.
+The normative protocol specification lives in the
+[Axis-protocol](https://github.com/AntonGrid/Axis-protocol) repository. Documents
+in this directory are **informative** for the protocol and describe the reference
+implementation only.
 
 ---
 
-# Directory Structure
+## Directory Structure
 
-```
+```text
 docs/
-├── protocol/
-├── architecture/
-├── api/
-├── platform/
-├── registry/
-├── specifications/
-├── rfc/
-└── legacy/
+├── README.md                       # This file
+├── Axis-Governance-and-ADR.md      # Governance and ADR/RFC process
+├── Axis-One-Pager.md               # High-level overview
+├── Axis-Terminology.md             # Terminology reference
+├── merkle-proof-verification.md    # Merkle proof verification
+├── implementation/
+│   ├── api.md                      # HTTP API reference
+│   ├── onchain-attestation.md      # Attestation → on-chain mapping
+│   ├── architecture.md             # (legacy) ENRG product architecture notes
+│   └── axis-architecture.md        # Axis protocol & domain integration overview
+└── platform/
+    ├── device-lifecycle.md         # Device lifecycle (implementation view)
+    └── provisioning.md            # Provisioning service specification
 ```
 
 ---
 
-# Directories
+## Entry Points
 
-## protocol/
-
-Contains the normative ENRG Protocol Specification.
-
-This directory defines protocol architecture, behavior, interfaces, governance, deployment, and security.
-
----
-
-## architecture/
-
-Contains Architecture Decision Records (ADR) and architectural documentation.
-
-Architecture documents describe design decisions that govern protocol evolution.
+1. **API** — start with [`implementation/api.md`](./implementation/api.md) and the
+   repository-level [`API.md`](../API.md) and [`openapi.yaml`](../openapi.yaml).
+2. **JSON Schemas** — see [`SCHEMAS.md`](../SCHEMAS.md) and the `schemas/` directory.
+3. **Platform** — device lifecycle and provisioning are described in
+   `platform/` (implementation view; the normative documents live in Axis-protocol).
+4. **On-chain integration** — `implementation/onchain-attestation.md` describes how
+   an Attestation is mapped to on-chain parameters.
 
 ---
 
-## api/
+## Relationship to the Protocol
 
-Contains API specifications for protocol services and reference implementations.
+- **Axis Protocol** defines the normative trust model, wire format, validation rules,
+  and lifecycles.
+- **Axis Core** implements those rules and documents any deployment-specific choices
+  here.
 
----
-
-## platform/
-
-Contains implementation guidance for platform components.
-
----
-
-## registry/
-
-Contains the official ENRG Protocol Registries.
-
-Current registries include:
-
-- Event Registry
-- Error Registry
-- Capability Registry
-- Manifest Registry
-
----
-
-## specifications/
-
-Contains normative documents supporting the protocol specification.
-
-Examples include:
-
-- ENRG Terminology
-- ENRG Conformance
-
----
-
-## rfc/
-
-Contains Requests for Comments proposing future protocol improvements.
-
-RFC documents SHALL NOT modify the protocol until approved through Protocol Governance.
-
----
-
-## legacy/
-
-Contains archived historical documentation preserved for reference.
-
-Documents stored in this directory SHALL NOT define current protocol behavior.
-
----
-
-# Documentation Authority
-
-The ENRG Protocol Specification SHALL remain the authoritative source defining protocol behavior.
-
-Supporting documents complement the specification but SHALL NOT override it unless explicitly stated.
+Conformance of this implementation with the Axis Protocol is verified by the
+conformance tests in `tests/` (see the “Conformance” section of the README).
