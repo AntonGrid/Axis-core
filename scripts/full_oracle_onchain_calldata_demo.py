@@ -19,46 +19,7 @@ if str(BASE_DIR) not in sys.path:
 from axis_core.onchain_bridge import build_attestation_params  # noqa: E402
 
 
-@dataclass
-class AxisClient:
-    """Minimal HTTP client for the /health and /oracle/attest endpoints."""
-
-    base_url: str = "http://localhost:8000"
-
-    def __post_init__(self) -> None:
-        self._client = httpx.Client(base_url=self.base_url, timeout=10.0)
-
-    def health(self) -> Dict[str, Any]:
-        resp = self._client.get("/health")
-        resp.raise_for_status()
-        return resp.json()
-
-    def oracle_attest_request(
-        self,
-        device_id: str,
-        nonce: str,
-        max_power_kw: float,
-        algo: str = "mock",
-        signature: Optional[str] = None,
-        timestamp: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        if timestamp is None:
-            now = datetime.now(timezone.utc).replace(microsecond=0)
-            timestamp = now.isoformat().replace("+00:00", "Z")
-        if signature is None:
-            signature = "deadbeef" * 8
-
-        payload: Dict[str, Any] = {
-            "device_id": device_id,
-            "nonce": nonce,
-            "timestamp": timestamp,
-            "algo": algo,
-            "payload": {"max_power_kw": max_power_kw},
-            "signature": signature,
-        }
-        resp = self._client.post("/oracle/attest", json=payload)
-        resp.raise_for_status()
-        return resp.json()
+from axis_client import AxisClient, encode_public_key, generate_device_key  # noqa: E402
 
 
 FUNCTION_SIGNATURE = "submitAttestation(bytes32,bytes32,bool,uint64,uint64)"
@@ -161,6 +122,13 @@ def main():
     # The AxisClient accepts base_url, so the --base-url option is honored.
     client = AxisClient(base_url=args.base_url)
 
+    # Real device: generate an Ed25519 key, register it, and sign the proof.
+    signing_key = generate_device_key()
+    public_key_b64 = encode_public_key(signing_key)
+    registered = client.register_device(public_key_b64)
+    device_id = registered["device_id"]
+    print(f"Registered device: {device_id}")
+
     print("=== Step 1: /health ===")
     try:
         health = client.health()
@@ -171,9 +139,10 @@ def main():
 
     print("\n=== Step 2: POST /oracle/attest (new format) ===")
     oracle_resp = client.oracle_attest_request(
-        device_id=args.device_id,
+        device_id=device_id,
         nonce=args.nonce,
         max_power_kw=args.max_power_kw,
+        signing_key=signing_key,
     )
     print(json.dumps(oracle_resp, indent=2))
 
