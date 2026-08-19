@@ -33,7 +33,7 @@ describe('Manifest Registry API', function () {
   });
 
   it('publishes and retrieves a manifest', async function () {
-    const payload = { manifest_version: '1.0', device_type: 'sensor', manufacturer: 'ENRG' };
+    const payload = { manifest_version: '1.0', device_type: 'sensor', manufacturer: 'Axis' };
     const keyPair = nacl.sign.keyPair();
     const signature = util.encodeBase64(nacl.sign.detached(Buffer.from(JSON.stringify(payload)), keyPair.secretKey));
     const publicKey = util.encodeBase64(keyPair.publicKey);

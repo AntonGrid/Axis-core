@@ -12,7 +12,7 @@ app.use(bodyParser.json());
 
 const PORT = process.env.PORT || 4000;
 const ADMIN_KEY = process.env.REGISTRY_ADMIN_KEY || 'secure-key';
-const SERVICE_NAME = process.env.SERVICE_NAME || 'enrg-manifest-registry';
+const SERVICE_NAME = process.env.SERVICE_NAME || 'axis-manifest-registry';
 
 const manifests = new Map();
 const snapshots = [];

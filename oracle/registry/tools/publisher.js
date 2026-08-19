@@ -12,7 +12,7 @@ const privateKey = keypair.secretKey;
 
 const payload = {
   device_id: 'test-device-001',
-  model: 'ENRG-ESP32-v1',
+  model: 'Axis-Device-v1',
   firmware_version: '2026.07.17',
   timestamp: new Date().toISOString()
 };

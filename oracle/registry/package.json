@@ -1,5 +1,5 @@
 {
-  "name": "enrg-registry-ref",
+  "name": "axis-manifest-registry",
   "version": "0.1.0",
   "main": "server.js",
   "license": "MIT",
@@ -17,7 +17,7 @@
     "keccak": "^3.0.3"
   },
   "devDependencies": {
-    "mocha": "^10.9.0",
+    "mocha": "^11.0.0",
     "node-fetch": "^2.7.0"
   }
 }
