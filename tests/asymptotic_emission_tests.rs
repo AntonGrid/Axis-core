@@ -7,18 +7,18 @@ use solana_sdk::{
     transaction::{Transaction, TransactionError},
 };
 
-// ПРИМЕЧАНИЕ: Эти тесты требуют полной интеграции с Anchor и solana-program-test
-// Здесь показана структура тестов
+// NOTE: These tests require full integration with Anchor and solana-program-test.
+// This file shows the intended test structure.
 
 #[tokio::test]
 async fn test_emission_at_zero_supply() {
-    // При 0% supply, энергия за 1 токен должна быть 1_000_000 Wh × 10^0 = 1_000_000 Wh
+    // At 0% supply, energy per token should be 1_000_000 Wh × 10^0 = 1_000_000 Wh
     
     // current_supply = 0
     // S = 0 / 1_000_000_000 = 0
     // E(S) = 1_000_000 × 10^0 = 1_000_000 Wh
     
-    // Проверяем, что можно минить 1 токен за 1_000_000 Wh
+    // Verify that 1 token can be minted for 1_000_000 Wh
     let energy_wh = 1_000_000u64;
     let expected_tokens = 1u64;
     
@@ -28,71 +28,71 @@ async fn test_emission_at_zero_supply() {
 
 #[tokio::test]
 async fn test_emission_at_25_percent_supply() {
-    // При 25% supply:
+    // At 25% supply:
     // S = 0.25
     // E(S) = 1_000_000 × 10^0.25 ≈ 1_000_000 × 1.778 ≈ 1_778_279 Wh
     
-    let current_supply = 250_000_000u64; // 25% от 1 млрд
+    let current_supply = 250_000_000u64; // 25% of 1 billion
     let energy_wh = 1_778_279u64;
     let expected_tokens = 1u64;
 }
 
 #[tokio::test]
 async fn test_emission_at_50_percent_supply() {
-    // При 50% supply:
+    // At 50% supply:
     // S = 0.5
     // E(S) = 1_000_000 × 10^0.5 ≈ 1_000_000 × 10 = 10_000_000 Wh
     
-    let current_supply = 500_000_000u64; // 50% от 1 млрд
+    let current_supply = 500_000_000u64; // 50% of 1 billion
     let energy_wh = 10_000_000u64;
     let expected_tokens = 1u64;
 }
 
 #[tokio::test]
 async fn test_emission_at_75_percent_supply() {
-    // При 75% supply:
+    // At 75% supply:
     // S = 0.75
     // E(S) = 1_000_000 × 10^0.75 ≈ 1_000_000 × 178.27 ≈ 178_270_000 Wh
     
-    let current_supply = 750_000_000u64; // 75% от 1 млрд
+    let current_supply = 750_000_000u64; // 75% of 1 billion
     let energy_wh = 178_270_000u64;
     let expected_tokens = 1u64;
 }
 
 #[tokio::test]
 async fn test_emission_at_90_percent_supply() {
-    // При 90% supply:
+    // At 90% supply:
     // S = 0.9
     // E(S) = 1_000_000 × 10^0.9 ≈ 1_000_000 × 1000 = 1_000_000_000 Wh (1 GWh!)
     
-    let current_supply = 900_000_000u64; // 90% от 1 млрд
+    let current_supply = 900_000_000u64; // 90% of 1 billion
     let energy_wh = 1_000_000_000u64; // 1 GWh
     let expected_tokens = 1u64;
 }
 
 #[tokio::test]
 async fn test_insufficient_energy_error() {
-    // Если энергия < energy_per_token, должна быть ошибка InsufficientEnergy
+    // If energy < energy_per_token, an InsufficientEnergy error should occur
     
     let current_supply = 500_000_000u64;
     let required_energy = 10_000_000u64;
-    let provided_energy = 5_000_000u64; // Меньше требуемого
+    let provided_energy = 5_000_000u64; // Less than required
     
     // expect error: InsufficientEnergy
 }
 
 #[tokio::test]
 async fn test_max_supply_reached_error() {
-    // Если текущий supply >= MAX_SUPPLY, должна быть ошибка MaxSupplyReached
+    // If current supply >= MAX_SUPPLY, a MaxSupplyReached error should occur
     
-    let current_supply = 1_000_000_000u64; // Уже на максимуме
+    let current_supply = 1_000_000_000u64; // Already at the maximum
     
     // expect error: MaxSupplyReached
 }
 
 #[tokio::test]
 async fn test_multiple_tokens_from_single_mint() {
-    // Если энергия = 3 × energy_per_token, должны минить 3 токена
+    // If energy = 3 × energy_per_token, 3 tokens should be minted
     
     let current_supply = 0u64;
     let energy_per_token = 1_000_000u64;
@@ -102,9 +102,9 @@ async fn test_multiple_tokens_from_single_mint() {
 
 #[tokio::test]
 async fn test_emission_event_emitted() {
-    // Проверяем, что событие EmissionDifficultyChanged эмитится при каждом минте
+    // Verify that an EmissionDifficultyChanged event is emitted on every mint
     
-    // event должен содержать:
+    // The event should contain:
     // - current_supply
     // - supply_fraction (S × 10^18)
     // - energy_per_token
@@ -112,16 +112,16 @@ async fn test_emission_event_emitted() {
 
 #[tokio::test]
 async fn test_arithmetic_overflow_protection() {
-    // Проверяем, что при очень высоких значениях k^S не происходит overflow
+    // Verify that no overflow occurs for very high k^S values
     
-    // Например, при S = 99.9%, должно быть либо:
-    // 1. Успешное вычисление с использованием u128
-    // 2. Ошибка ExcessiveEnergyRequired
+    // For example, at S = 99.9%, either:
+    // 1. A successful computation using u128
+    // 2. An ExcessiveEnergyRequired error
 }
 
 #[tokio::test]
 async fn test_energy_per_token_calculation() {
-    // Прямой тест функции calculate_energy_per_token()
+    // Direct test of the calculate_energy_per_token() function
     
     // Test case 1: S=0%, k=10 => E=1_000_000
     // Test case 2: S=50%, k=10 => E≈10_000_000
@@ -130,7 +130,7 @@ async fn test_energy_per_token_calculation() {
 
 #[tokio::test]
 async fn test_exp_approx_accuracy() {
-    // Проверяем точность функции exp_approx()
+    // Verify the accuracy of the exp_approx() function
     
     // exp(0) = 1.0
     // exp(1) ≈ 2.71828
@@ -140,39 +140,39 @@ async fn test_exp_approx_accuracy() {
 
 #[tokio::test]
 async fn test_commission_distribution_with_asymptotic_emission() {
-    // Проверяем, что комиссия (85%/15%) корректно распределяется 
-    // с новой асимптотической моделью
+    // Verify that the fee (85%/15%) is distributed correctly
+    // with the new asymptotic model
     
-    // Если миним 100 токенов:
-    // - user: 85 токенов
-    // - buyback (20%): 3 токена
-    // - staking (40%): 6 токенов
-    // - dao (30%): 4.5 токена → 4
-    // - emergency: остаток
+    // If 100 tokens are minted:
+    // - user: 85 tokens
+    // - buyback (20%): 3 tokens
+    // - staking (40%): 6 tokens
+    // - dao (30%): 4.5 tokens → 4
+    // - emergency: the remainder
 }
 
 #[tokio::test]
 async fn test_sequential_mints_increase_difficulty() {
-    // Последовательные минты должны иметь возрастающую сложность
+    // Sequential mints must have increasing difficulty
     
     // Mint 1: 0 tokens → 1 million tokens, energy_required = 1_000_000
-    // Mint 2: 1M → 10M, energy_required должна быть выше
-    // Mint 3: 10M → 100M, energy_required должна быть еще выше
+    // Mint 2: 1M → 10M, energy_required should be higher
+    // Mint 3: 10M → 100M, energy_required should be even higher
 }
 
 #[tokio::test]
 async fn test_k_parameter_variation() {
-    // Тест для разных значений k (3, 5, 10)
+    // Test for different k values (3, 5, 10)
     
-    // При k=3, эмиссия более плавная
-    // При k=10, эмиссия более резкая
+    // With k=3, emission is smoother
+    // With k=10, emission is sharper
     
-    // Сравниваем energy_per_token для одного S с разными k
+    // Compare energy_per_token for the same S with different k
 }
 
 #[tokio::test]
 async fn test_producer_energy_accumulation() {
-    // Проверяем, что producer.energy_wh корректно накапливается
+    // Verify that producer.energy_wh accumulates correctly
     
     // Initial: 0
     // After mint 1 (1_000_000 Wh): 1_000_000
@@ -181,7 +181,7 @@ async fn test_producer_energy_accumulation() {
 
 #[cfg(test)]
 mod unit_tests {
-    // Юнит-тесты для вспомогательных функций
+    // Unit tests for helper functions
     
     #[test]
     fn test_calculate_energy_per_token_zero_supply() {
@@ -215,11 +215,11 @@ mod unit_tests {
     }
 }
 
-// ============ ИНТЕГРАЦИОННЫЕ ТЕСТЫ ============
+// ============ INTEGRATION TESTS ============
 
 #[cfg(test)]
 mod integration_tests {
-    // Полные сценарии с deployment контракта
+    // Full scenarios with contract deployment
     
     #[tokio::test]
     async fn test_full_mint_lifecycle() {
@@ -250,7 +250,7 @@ mod integration_tests {
 
 #[cfg(test)]
 mod benchmarks {
-    // Проверка производительности вычислений
+    // Performance checks of the computations
     
     #[test]
     fn bench_calculate_energy_per_token() {

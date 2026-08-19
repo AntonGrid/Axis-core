@@ -66,9 +66,9 @@ FUNCTION_SIGNATURE = "submitAttestation(bytes32,bytes32,bool,uint64,uint64)"
 
 def build_full_attestation_deny_from_oracle_response(resp: dict) -> dict:
     """
-    Превращает ответ /oracle/attest (новый формат) в полную Attestation,
-    но принудительно устанавливает decision.allowed = False,
-    чтобы продемонстрировать on-chain поведение для отказа.
+    Convert the /oracle/attest response (new format) into a full Attestation,
+    but forcibly sets decision.allowed = False,
+    to demonstrate the on-chain behavior for a deny case.
     """
     device_id = resp["device_id"]
     attestation_id = resp["attestation_id"]
@@ -94,7 +94,7 @@ def build_full_attestation_deny_from_oracle_response(resp: dict) -> dict:
         "device_id": device_id,
         "proof": proof,
         "decision": {
-            # ключевой момент: здесь гарантированно False
+            # key point: this is guaranteed to be False
             "allowed": False,
             "reason": "overridden-to-deny-demo",
             "max_power_kw": oracle_decision.get("max_power_kw"),
@@ -152,7 +152,7 @@ def main():
     )
     args = parser.parse_args()
 
-    client = ENRGClient()
+    client = AxisClient()
 
     print("=== Step 1: /health ===")
     try:
@@ -188,8 +188,8 @@ def main():
     calldata = build_calldata(params)
     print(calldata)
     print(
-        "\n(Скрипт НЕ шлёт транзакцию, а только печатает calldata с allowed=false — "
-        "его можно использовать в EOF-транзакции / CLI-туле для демонстрации отказного кейса.)"
+        "\n(The script does NOT send a transaction; it only prints calldata with allowed=false — "
+        "use it with your own EOF transaction / CLI tool to demonstrate the deny case.)"
     )
 
 

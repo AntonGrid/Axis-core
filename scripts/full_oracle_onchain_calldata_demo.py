@@ -66,8 +66,8 @@ FUNCTION_SIGNATURE = "submitAttestation(bytes32,bytes32,bool,uint64,uint64)"
 
 def build_full_attestation_from_oracle_response(resp: dict) -> dict:
     """
-    Превращает ответ /oracle/attest (новый формат) в полную Attestation,
-    совместимую с attestation.schema.json и onchain_bridge.
+    Convert the /oracle/attest response (new format) into a full Attestation,
+    compatible with attestation.schema.json and onchain_bridge.
     """
     device_id = resp["device_id"]
     attestation_id = resp["attestation_id"]
@@ -138,7 +138,7 @@ def main():
     parser.add_argument(
         "--base-url",
         default="http://localhost:8000",
-        help="(зарезервировано; текущая ENRGClient использует базовый URL из настроек)",
+        help="Base URL of the Axis backend (default: http://localhost:8000)",
     )
     parser.add_argument(
         "--device-id",
@@ -195,8 +195,8 @@ def main():
     calldata = build_calldata(params)
     print(calldata)
     print(
-        "\n(Скрипт НЕ шлёт транзакцию, а только печатает calldata — "
-        "дальше её можно использовать в EOF-транзакции / CLI-туле.)"
+        "\n(The script does NOT send a transaction; it only prints calldata — "
+        "use it with your own EOF transaction / CLI tool.)"
     )
 
 

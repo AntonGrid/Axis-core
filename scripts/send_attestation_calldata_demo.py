@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 
-# --- Импортируем on-chain bridge ---
+# --- Import the on-chain bridge ---
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
@@ -20,7 +20,7 @@ from axis_core.onchain_bridge import build_attestation_params  # noqa: E402
 @dataclass
 class AxisClient:
     """
-    Минимальный клиент только для /health и /oracle/attest (новый формат запроса).
+    Minimal client for the /health and /oracle/attest endpoints (new request format).
     """
     base_url: str = "http://localhost:8000"
 
@@ -69,7 +69,7 @@ def build_full_attestation_from_oracle_response(
     oracle_id: str = "oracle_main_1",
 ) -> Dict[str, Any]:
     """
-    Строим полную Attestation (schema_version=1.0) из ответа /oracle/attest.
+    Build a full Attestation (schema_version=1.0) from the /oracle/attest response.
     """
     now = datetime.now(timezone.utc).replace(microsecond=0)
     ts_str = now.isoformat().replace("+00:00", "Z")
@@ -110,10 +110,10 @@ def encode_submit_attestation_calldata(
     issued_at: int,
 ) -> str:
     """
-    Encoder для:
+    Encoder for:
       submitAttestation(bytes32 attestationId, bytes32 deviceId, bool allowed, uint64 maxPowerW, uint64 issuedAt)
 
-    selector уже известен: 0x44b67025
+    selector is already known: 0x44b67025
     """
     selector = "44b67025"
 
@@ -149,7 +149,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--base-url",
         default="http://localhost:8000",
-        help="Base URL of ENRG backend (default: http://localhost:8000)",
+        help="Base URL of the Axis backend (default: http://localhost:8000)",
     )
     parser.add_argument(
         "--device-id",
@@ -235,7 +235,7 @@ def main() -> None:
     print(f"calldata: {calldata}")
     print()
 
-    # Готовая команда для cast send
+    # Ready-to-use cast send command
     allowed_str = str(params.allowed).lower()
     cast_cmd = (
         f'cast send {args.contract_address} '
