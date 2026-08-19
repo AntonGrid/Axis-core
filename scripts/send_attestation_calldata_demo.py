@@ -18,7 +18,7 @@ from axis_core.onchain_bridge import build_attestation_params  # noqa: E402
 
 
 @dataclass
-class SimpleENRGClient:
+class AxisClient:
     """
     Минимальный клиент только для /health и /oracle/attest (новый формат запроса).
     """
@@ -184,7 +184,7 @@ def main() -> None:
     args = parse_args()
 
     # 1) Health check
-    client = SimpleENRGClient(base_url=args.base_url)
+    client = AxisClient(base_url=args.base_url)
     print("=== Step 1: /health ===")
     health = client.health()
     print(health)

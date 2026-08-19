@@ -2,19 +2,63 @@
 import argparse
 import json
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Dict, Optional
 
+import httpx
 from eth_abi import encode as abi_encode
 from eth_utils import keccak, to_hex
 
-# Добавляем корень репозитория в sys.path, чтобы можно было импортировать app.* и tools.*
+# Add the repository root to sys.path so axis_core.* can be imported.
 BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from axis_core.onchain_bridge import build_attestation_params  # noqa: E402
-from tools.client import ENRGClient  # noqa: E402
+
+
+@dataclass
+class AxisClient:
+    """Minimal HTTP client for the /health and /oracle/attest endpoints."""
+
+    base_url: str = "http://localhost:8000"
+
+    def __post_init__(self) -> None:
+        self._client = httpx.Client(base_url=self.base_url, timeout=10.0)
+
+    def health(self) -> Dict[str, Any]:
+        resp = self._client.get("/health")
+        resp.raise_for_status()
+        return resp.json()
+
+    def oracle_attest_request(
+        self,
+        device_id: str,
+        nonce: str,
+        max_power_kw: float,
+        algo: str = "mock",
+        signature: Optional[str] = None,
+        timestamp: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if timestamp is None:
+            now = datetime.now(timezone.utc).replace(microsecond=0)
+            timestamp = now.isoformat().replace("+00:00", "Z")
+        if signature is None:
+            signature = "deadbeef" * 8
+
+        payload: Dict[str, Any] = {
+            "device_id": device_id,
+            "nonce": nonce,
+            "timestamp": timestamp,
+            "algo": algo,
+            "payload": {"max_power_kw": max_power_kw},
+            "signature": signature,
+        }
+        resp = self._client.post("/oracle/attest", json=payload)
+        resp.raise_for_status()
+        return resp.json()
 
 
 FUNCTION_SIGNATURE = "submitAttestation(bytes32,bytes32,bool,uint64,uint64)"
