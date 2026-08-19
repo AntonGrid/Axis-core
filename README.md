@@ -155,6 +155,24 @@ For a deeper dive, read the [Architecture Decision Records](https://github.com/A
 
 ---
 
+## Conformance
+
+Axis Core aims to be a faithful reference implementation of the [Axis Protocol](https://github.com/AntonGrid/Axis-protocol).
+
+The conformance tests in `tests/test_conformance.py` verify:
+
+- the committed [`openapi.yaml`](./openapi.yaml) matches the actual FastAPI routes;
+- the canonical schemas in `schemas/` stay in sync with the runtime schemas in `axis_core/schemas/`;
+- schema field names follow the protocol glossary;
+- the attestation examples (`attestation-example.json`, `attestation-example-deny.json`)
+  are schema-valid and round-trip through the oracle API (allowed and denied scenarios).
+
+Known deviations and gaps (license metadata, manifest vs ADR-0004, lifecycle
+states, wire format, mock policy engine) are **documented, not silently changed** —
+see [docs/conformance.md](./docs/conformance.md).
+
+---
+
 ## Contributing
 
 We welcome contributions! Please read:
