@@ -11,7 +11,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 const PORT = process.env.PORT || 4000;
-const ADMIN_KEY = process.env.REGISTRY_ADMIN_KEY || 'secure-key';
+const ADMIN_KEY = process.env.REGISTRY_ADMIN_KEY;
 const SERVICE_NAME = process.env.SERVICE_NAME || 'axis-manifest-registry';
 
 const manifests = new Map();
@@ -32,6 +32,10 @@ function canonicalize(data) {
   return typeof data === 'string' ? data : JSON.stringify(data);
 }
 
+// NOTE (known limitation): the current "root" is a linear accumulator of
+// keccak256 hashes in Map insertion order. It is NOT a Merkle tree and is NOT
+// compatible with on-chain `verify_merkle_proof`. TODO: implement a real
+// Merkle registry with per-leaf membership proofs.
 function createSnapshot() {
   const ids = Array.from(manifests.keys());
   let root = Buffer.alloc(32, 0);
@@ -95,6 +99,13 @@ app.get('/api/v1/manifests', (req, res) => {
 });
 
 if (require.main === module) {
+  if (!ADMIN_KEY) {
+    console.error(
+      'REGISTRY_ADMIN_KEY is required: set it to start the Manifest Registry ' +
+        '(see oracle/registry/README.md).'
+    );
+    process.exit(1);
+  }
   app.listen(PORT, () => {
     console.log(`${SERVICE_NAME} running on port ${PORT}`);
   });
