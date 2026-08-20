@@ -238,7 +238,7 @@ List stored oracle requests (paginated) and retrieve a specific request by ID.
 The backend exposes building blocks rather than a single `/attestation` endpoint:
 
 - `/oracle/attest` — makes a decision (allowed / deny);
-- `axis_core.onchain_bridge.build_attestation_params(attestation)` — converts a JSON
+- `axis_core.adapters.evm.build_attestation_params(attestation)` — converts a JSON
   Attestation into on-chain parameters suitable for a Solidity function:
 
 ```solidity

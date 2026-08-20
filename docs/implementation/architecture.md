@@ -60,7 +60,7 @@
      - `axis_core/schemas_loader.py` — helper functions for working with schemas.
 
 4. **On-chain Bridge (Python → Solidity)**
-   - Module: `axis_core/onchain_bridge.py`
+   - Module: `axis_core/adapters/evm.py`
    - Core function: `build_attestation_params(attestation: dict) -> OnchainAttestationParams`
    - Structure `OnchainAttestationParams`:
      ```python

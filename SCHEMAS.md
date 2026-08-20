@@ -81,7 +81,7 @@ issued_at (string, required) — RFC3339/ISO 8601 timestamp of when the oracle i
 
 oracle_signature (string, required) — Oracle’s signature over the attestation content (opaque for the schema).
 
-This document is what `axis_core.onchain_bridge.build_attestation_params()` consumes.
+This document is what `axis_core.adapters.evm.build_attestation_params()` consumes.
 
 2. Oracle attest request (schemas/oracle_attest_request.schema.json)
 Purpose

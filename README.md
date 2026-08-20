@@ -27,7 +27,8 @@ Axis-core/
 │   ├── services/           # Business logic (Provisioning, Registry)
 │   ├── schemas/            # Runtime JSON Schemas (validated with jsonschema)
 │   ├── main.py             # FastAPI application entry point
-│   ├── onchain_bridge.py   # Attestation → on-chain parameter mapping (chain-agnostic)
+│   ├── adapters/          # Chain adapters (evm.py = EVM domain adapter)
+│   ├── onchain_bridge.py  # Deprecated re-export → use adapters.evm
 │   ├── oracle_storage.py   # In-memory oracle storage
 │   ├── schema_utils.py     # JSON Schema loading / validation helpers
 │   └── schemas_loader.py   # Attestation schema loader

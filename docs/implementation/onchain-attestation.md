@@ -56,7 +56,7 @@ set). The attestation is stored in a public mapping, e.g.
 
 ## 3. Mapping off-chain → on-chain
 
-Path: `JSON → axis_core.onchain_bridge.build_attestation_params(...) → parameters for submitAttestation`.
+Path: `JSON → axis_core.adapters.evm.build_attestation_params(...) → parameters for submitAttestation`.
 
 | Attestation field | On-chain parameter | Conversion |
 | :--- | :--- | :--- |
@@ -102,7 +102,7 @@ function (e.g. `setTrustedOracle(address oracle, bool trusted)`).
 
 ## 5. Related documents
 
-- `axis_core/onchain_bridge.py` — bridge implementation.
+- `axis_core/adapters/evm.py` — bridge implementation.
 - `scripts/demo_onchain_bridge.py`, `scripts/demo_onchain_bridge_deny.py` — demos.
 - `scripts/full_oracle_onchain_calldata_demo.py` — live `/oracle/attest` → calldata flow.
 - `SCHEMAS.md` — attestation schema reference.

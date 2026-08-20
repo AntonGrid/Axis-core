@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from axis_core.onchain_bridge import build_attestation_params  # noqa: E402
+from axis_core.adapters.evm import build_attestation_params  # noqa: E402
 
 
 from axis_client import AxisClient, encode_public_key, generate_device_key  # noqa: E402

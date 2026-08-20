@@ -111,7 +111,7 @@ Load the Attestation JSON.
 
 Normalize it for schema_version: "1.0" (if missing, it is added).
 
-Call axis_core.onchain_bridge.build_attestation_params(...).
+Call axis_core.adapters.evm.build_attestation_params(...).
 
 Print on-chain parameters and ABI-encoded calldata for submitAttestation(...).
 
@@ -172,7 +172,7 @@ chainId, gas, fees = according to your mainnet setup.
 Reuse the Python function:
 
 python
-from axis_core.onchain_bridge import build_attestation_params
+from axis_core.adapters.evm import build_attestation_params
 Or reimplement the same logic in your language of choice:
 
 attestationId and deviceId are hashed to bytes32,
@@ -268,7 +268,7 @@ Take the printed calldata and plug it into your transaction builder.
 
 Mode B — JSON → ENRG bridge logic → your contract binding
 
-Reuse axis_core.onchain_bridge.build_attestation_params(...) in your backend or reimplement its logic in your language.
+Reuse axis_core.adapters.evm.build_attestation_params(...) in your backend or reimplement its logic in your language.
 
 Call your contract binding's submitAttestation(...) with the derived parameters.
 

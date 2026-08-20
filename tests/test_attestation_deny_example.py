@@ -3,7 +3,7 @@ from pathlib import Path
 
 import jsonschema
 
-from axis_core.onchain_bridge import build_attestation_params
+from axis_core.adapters.evm import build_attestation_params
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
