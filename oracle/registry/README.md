@@ -10,6 +10,7 @@ The Manifest Registry is a reference service of **Axis Core**. It publishes sign
 - Retrieve a manifest by id via `GET /api/v1/manifests/:id`
 - Create a Merkle snapshot via `POST /api/v1/merkle/snapshot`
 - Read the latest Merkle root via `GET /api/v1/merkle/current`
+- Get a per-leaf Merkle membership proof via `GET /api/v1/merkle/proof/:manifestId`
 - Health check at `GET /health`
 
 ## Local run
@@ -62,13 +63,32 @@ curl -X POST http://localhost:4000/api/v1/merkle/snapshot \
 
 ## Known limitations
 
-- **Snapshots are not a Merkle tree.** The current `root` is a linear
-  accumulator of keccak256 hashes over the manifests in `Map` insertion order.
-  It is NOT a Merkle root and is NOT compatible with on-chain
-  `verify_merkle_proof`. A real Merkle registry with per-leaf membership
-  proofs is planned (see `app.js`).
 - **In-memory storage.** Published manifests and snapshots are kept in memory
   and are lost on restart. Persistence is a separate milestone.
+- **16-byte `manifest_id`.** For on-chain compatibility (`verify_merkle_proof`
+  expects `manifest_id: [u8; 16]`), the registry rejects ids that are not
+  exactly 16 bytes (UTF-8).
+
+## Merkle format (on-chain compatible)
+
+Snapshots use a SHA-256 Merkle tree that is bit-compatible with the ENRG
+on-chain verifier (`merkle_proof_verification.rs`) and the reference client
+helpers (`ENRG/tests/helpers/merkle.ts`):
+
+```text
+leaf = SHA-256(manifest_id(16) || content_hash(32))
+node = SHA-256(left(32) || right(32))        // single hash
+```
+
+- `content_hash = SHA-256(canonical JSON payload)` (canonical = sorted keys,
+  no whitespace — see `app.js` `canonicalize`).
+- Odd levels duplicate the last node.
+- A leaf's `position` is its index in the snapshot; proof siblings alternate
+  left/right based on the position bits (exactly as the on-chain
+  `compute_merkle_root` expects).
+
+The publisher that registers a manifest on-chain MUST use the same
+`content_hash` so the leaf matches `ManifestVerification.content_hash`.
 
 A ready-to-use publisher utility lives in `tools/publisher.js`.
 

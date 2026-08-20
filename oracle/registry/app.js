@@ -1,9 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const crypto = require('crypto');
 const nacl = require('tweetnacl');
 const util = require('tweetnacl-util');
-const keccak = require('keccak');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -32,26 +32,101 @@ function canonicalize(data) {
   return typeof data === 'string' ? data : JSON.stringify(data);
 }
 
-// NOTE (known limitation): the current "root" is a linear accumulator of
-// keccak256 hashes in Map insertion order. It is NOT a Merkle tree and is NOT
-// compatible with on-chain `verify_merkle_proof`. TODO: implement a real
-// Merkle registry with per-leaf membership proofs.
+// ── SHA-256 Merkle — bit-compatible with the ENRG on-chain verifier
+//    (merkle_proof_verification.rs) and ENRG tests/helpers/merkle.ts:
+//    leaf = SHA-256(manifest_id(16) || content_hash(32))
+//    node = SHA-256(left(32) || right(32))   (single hash)
+//    Odd levels duplicate the last node. The leaf index is the position;
+//    proof siblings alternate left/right based on the position bits. ──
+
+function sha256(data) {
+  return crypto.createHash('sha256').update(data).digest();
+}
+
+function merkleHash(left, right) {
+  return sha256(Buffer.concat([left, right]));
+}
+
+/** Deterministic manifest content hash: SHA-256 of the canonical payload. */
+function contentHashOf(payload) {
+  return sha256(Buffer.from(canonicalize(payload)));
+}
+
+/** leaf = SHA-256(manifest_id(16 bytes) || content_hash(32 bytes)). */
+function manifestLeaf(manifestId, contentHash) {
+  return sha256(Buffer.concat([Buffer.from(manifestId, 'utf8'), contentHash]));
+}
+
+/**
+ * Build a Merkle tree from 32-byte raw leaf hashes (NOT re-hashed — matches
+ * on-chain `compute_merkle_root`). Returns { levels, root }.
+ */
+function buildMerkleTree(rawLeaves) {
+  const leaves = rawLeaves;
+  const levels = [leaves];
+  let level = leaves;
+  while (level.length > 1) {
+    const next = [];
+    for (let i = 0; i < level.length; i += 2) {
+      next.push(merkleHash(level[i], level[i + 1] || level[i]));
+    }
+    levels.push(next);
+    level = next;
+  }
+  return { levels, root: levels[levels.length - 1][0] };
+}
+
+/** Sibling path for the leaf at `index` (mirror of ENRG tests/helpers/merkle.ts). */
+function getProof(tree, index) {
+  const proof = [];
+  let idx = index;
+  for (let li = 0; li < tree.levels.length - 1; li++) {
+    const level = tree.levels[li];
+    const sibling = idx % 2 === 1 ? idx - 1 : idx + 1;
+    proof.push(sibling < level.length ? level[sibling] : level[idx]);
+    idx = Math.floor(idx / 2);
+  }
+  return proof;
+}
+
 function createSnapshot() {
   const ids = Array.from(manifests.keys());
-  let root = Buffer.alloc(32, 0);
-  for (const id of ids) {
+  const leaves = ids.map((id) => {
     const entry = manifests.get(id);
-    const hash = keccak('keccak256').update(canonicalize(entry)).digest();
-    root = keccak('keccak256').update(Buffer.concat([root, hash])).digest();
-  }
-
-  return {
+    return manifestLeaf(id, contentHashOf(entry.payload));
+  });
+  const tree = buildMerkleTree(leaves);
+  const snapshot = {
     id: uuidv4(),
-    root: root.toString('hex'),
+    root: tree.root.toString('hex'),
     total: ids.length,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    // Leaves are kept so proofs stay valid even if manifests are added
+    // after this snapshot was created.
+    leaves: leaves.map((l) => l.toString('hex')),
   };
+  snapshots.push(snapshot);
+  return snapshot;
 }
+
+function findSnapshotWithLeaf(manifestId) {
+  const entry = manifests.get(manifestId);
+  if (!entry) return null;
+  const leafHex = manifestLeaf(
+    manifestId,
+    contentHashOf(entry.payload)
+  ).toString('hex');
+  // Prefer the most recent snapshot that contains this leaf.
+  for (let i = snapshots.length - 1; i >= 0; i--) {
+    const snap = snapshots[i];
+    const index = snap.leaves.indexOf(leafHex);
+    if (index !== -1) {
+      return { snapshot: snap, leafHex, index };
+    }
+  }
+  return null;
+}
+
 
 app.get('/health', (req, res) => {
   res.json({ ok: true, service: SERVICE_NAME, manifests: manifests.size, snapshots: snapshots.length });
@@ -61,6 +136,12 @@ app.post('/api/v1/manifests', (req, res) => {
   const { manifest_id, payload, signature, public_key } = req.body;
   if (!manifest_id || !payload || !signature || !public_key) {
     return res.status(400).json({ error: 'Missing fields' });
+  }
+
+  // On-chain compatibility requires a 16-byte manifest id
+  // (see merkle_proof_verification.rs: manifest_id([u8; 16])).
+  if (Buffer.byteLength(String(manifest_id), 'utf8') !== 16) {
+    return res.status(400).json({ error: 'manifest_id must be exactly 16 bytes' });
   }
 
   if (!verifySignature(payload, signature, public_key)) {
@@ -82,8 +163,11 @@ app.post('/api/v1/merkle/snapshot', (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  if (manifests.size === 0) {
+    return res.status(400).json({ error: 'No manifests to snapshot' });
+  }
+
   const snapshot = createSnapshot();
-  snapshots.push(snapshot);
   res.status(201).json(snapshot);
 });
 
@@ -91,7 +175,33 @@ app.get('/api/v1/merkle/current', (req, res) => {
   if (snapshots.length === 0) {
     return res.json({ root: null, message: 'No snapshots yet' });
   }
-  res.json(snapshots[snapshots.length - 1]);
+  const s = snapshots[snapshots.length - 1];
+  res.json({ id: s.id, root: s.root, total: s.total, timestamp: s.timestamp });
+});
+
+app.get('/api/v1/merkle/proof/:manifestId', (req, res) => {
+  const { manifestId } = req.params;
+  if (!manifests.has(manifestId)) {
+    return res.status(404).json({ error: 'Manifest not found' });
+  }
+
+  const found = findSnapshotWithLeaf(manifestId);
+  if (!found) {
+    return res.status(404).json({ error: 'No snapshot contains this manifest' });
+  }
+
+  const { snapshot, leafHex, index } = found;
+  const leaves = snapshot.leaves.map((hex) => Buffer.from(hex, 'hex'));
+  const tree = buildMerkleTree(leaves);
+  const proof = getProof(tree, index).map((h) => h.toString('hex'));
+
+  res.json({
+    manifest_id: manifestId,
+    root: snapshot.root,
+    leaf: leafHex,
+    position: index,
+    proof,
+  });
 });
 
 app.get('/api/v1/manifests', (req, res) => {
