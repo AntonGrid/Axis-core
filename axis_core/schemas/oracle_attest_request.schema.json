@@ -42,7 +42,7 @@
     "signature": {
       "type": "string",
       "minLength": 1,
-      "description": "Hex-encoded signature of the proof payload."
+      "description": "Base64-encoded Ed25519 signature over the canonical proof message."
     }
   },
   "required": [

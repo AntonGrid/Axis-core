@@ -22,9 +22,9 @@ from fastapi.testclient import TestClient
 from jsonschema import Draft7Validator
 
 from axis_core.main import app
-from axis_core.signature_utils import generate_device_key
+from axis_core.signature_utils import encode_public_key, generate_device_key
 
-from tests.signature_helpers import build_signed_proof, make_registered_device
+from tests.signature_helpers import build_signed_proof, make_registered_device, now_iso8601_z
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 client = TestClient(app)
@@ -122,24 +122,28 @@ def test_attestation_examples_validate_against_schema():
         )
 
 
-def test_attestation_examples_through_oracle_api():
-    for example_name in ("attestation-example.json", "attestation-example-deny.json"):
-        example = load_json(BASE_DIR / example_name)
+def test_attestation_round_trip_through_oracle_api():
+    # The static examples (`attestation-example*.json`) remain schema-valid
+    # documents, but the live API now verifies device signatures and enforces
+    # freshness/replay, so a real signed proof is used for the end-to-end flow.
+    key, device_id = make_registered_device(client)
+    proof = build_signed_proof(key, device_id, "nonce_roundtrip_123", now_iso8601_z(), 2.5)
 
-        resp = client.post("/oracle/attest", json=example)
-        assert resp.status_code == 200, f"{example_name}: {resp.text}"
-        body = resp.json()
-        assert body["status"] == "received"
-        assert body["attestation_id"] == example["attestation_id"]
+    resp = client.post("/oracle/attest", json=proof)
+    assert resp.status_code == 200
+    att_id = resp.json()["attestation_id"]
 
-        stored = client.get(f"/oracle/attestations/{example['attestation_id']}")
-        assert stored.status_code == 200
-        assert stored.json() == example, f"{example_name} was modified on storage"
+    stored = client.get(f"/oracle/attestations/{att_id}")
+    assert stored.status_code == 200
+    stored_att = stored.json()
+    assert stored_att["device_id"] == device_id
+    assert stored_att["decision"]["allowed"] is True
+    assert stored_att["decision"]["reason"] == "ok"
 
 
 def test_oracle_decision_allowed():
     key, device_id = make_registered_device(client)
-    proof = build_signed_proof(key, device_id, "nonce_allowed_123456", "2026-07-25T19:05:00Z", 2.5)
+    proof = build_signed_proof(key, device_id, "nonce_allowed_123456", now_iso8601_z(), 2.5)
 
     resp = client.post("/oracle/attest", json=proof)
     assert resp.status_code == 200
@@ -151,7 +155,7 @@ def test_oracle_decision_allowed():
 
 def test_oracle_decision_denied_when_power_exceeds_limit():
     key, device_id = make_registered_device(client)
-    proof = build_signed_proof(key, device_id, "nonce_denied_123456", "2026-07-25T19:05:00Z", 10.0)
+    proof = build_signed_proof(key, device_id, "nonce_denied_123456", now_iso8601_z(), 10.0)
 
     resp = client.post("/oracle/attest", json=proof)
     assert resp.status_code == 200
@@ -166,7 +170,7 @@ def test_oracle_rejects_unregistered_device_and_bad_signature():
     # Unregistered device → denied, no signature check leak.
     key, _ = make_registered_device(client)
     proof = build_signed_proof(
-        key, "dev_0123456789abcdef", "nonce_conc_12345", "2026-07-25T19:05:00Z", 2.5
+        key, "dev_0123456789abcdef", "nonce_conc_12345", now_iso8601_z(), 2.5
     )
     resp = client.post("/oracle/attest", json=proof)
     assert resp.json()["decision"]["reason"] == "device_not_registered"
@@ -174,7 +178,7 @@ def test_oracle_rejects_unregistered_device_and_bad_signature():
     # Registered device, wrong signature → denied.
     key2, device_id2 = make_registered_device(client)
     other_key = generate_device_key()
-    proof2 = build_signed_proof(other_key, device_id2, "nonce_conc_23456", "2026-07-25T19:05:00Z", 2.5)
+    proof2 = build_signed_proof(other_key, device_id2, "nonce_conc_23456", now_iso8601_z(), 2.5)
     resp2 = client.post("/oracle/attest", json=proof2)
     assert resp2.json()["decision"]["reason"] == "signature_invalid"
 
@@ -204,10 +208,7 @@ def test_canonical_proof_message_is_deterministic_and_excludes_signature():
 # ---------------------------------------------------------------------------
 
 def test_provisioning_register_attest_registry_flow():
-    public_key = "conformance-test-public-key-0001"
-    register = client.post("/provisioning/register", json={"public_key": public_key})
-    assert register.status_code == 200
-    device_id = register.json()["device_id"]
+    key, device_id = make_registered_device(client)
     assert device_id.startswith("dev_")
 
     attest = client.post(
@@ -216,7 +217,7 @@ def test_provisioning_register_attest_registry_flow():
             "schema_version": "1.0",
             "device_id": device_id,
             "nonce": "conformance_nonce_1234",
-            "timestamp": "2026-07-25T19:00:00Z",
+            "timestamp": now_iso8601_z(),
             "algo": "mock",
             "payload": {"max_power_kw": 2.5},
             "signature": "deadbeef" * 8,
@@ -229,5 +230,5 @@ def test_provisioning_register_attest_registry_flow():
     assert record.status_code == 200
     rec = record.json()
     assert rec["device_id"] == device_id
-    assert rec["public_key"] == public_key
+    assert rec["public_key"] == encode_public_key(key)
     assert rec["lifecycle_state"] == "provisioned"

@@ -133,16 +133,17 @@ paths:
       summary: Oracle attestation decision
       description: |
         Two modes:
-        1. Legacy: a full Attestation document is validated, stored, and a
-           summary is returned.
-        2. New: an oracle_attest_request is validated, the device Ed25519
-           signature is verified against the registered public key, and a
-           decision is computed by the (mock) policy engine.
+        1. Legacy: a full Attestation document. The embedded device proof is
+           re-verified (signature + freshness/replay + policy) and the
+           attestation is re-signed by the oracle; unverifiable proofs are
+           rejected with 403.
+        2. New: an oracle_attest_request. The device Ed25519 signature is
+           verified against the registered public key, freshness/replay are
+           enforced, and the resulting attestation is signed by the oracle
+           (Ed25519 key from ORACLE_SECRET_KEY).
 
-        Signature verification (new mode): the device must be registered, and
-        the Base64-encoded Ed25519 signature must be valid over the canonical
-        message (see docs/conformance.md). The dev-only `mock` algorithm is
-        accepted only when `AXIS_ALLOW_MOCK` is set.
+        The dev-only `mock` algorithm is accepted only when `AXIS_ALLOW_MOCK`
+        is set. See docs/conformance.md for the canonical message and reasons.
       requestBody:
         required: true
         content:
@@ -170,6 +171,29 @@ paths:
                   detail:
                     type: string
                     example: "Validation error: 'signature' is a required property"
+        '403':
+          description: Legacy attestation rejected (unverifiable proof)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: object
+                    properties:
+                      reason:
+                        type: string
+                        example: signature_invalid
+        '503':
+          description: Oracle signing key not configured
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: oracle key not configured
 
   /oracle/attestations:
     get:
@@ -297,11 +321,20 @@ components:
       properties:
         public_key:
           type: string
-          description: Device public key (e.g., Ed25519)
+          description: Base64-encoded 32-byte Ed25519 public key
         manifest_ref:
           type: string
           description: Optional reference to a DeviceManifest
           example: manifest:v0-placeholder
+        signature:
+          type: string
+          description: >-
+            Base64-encoded 64-byte Ed25519 proof-of-possession signature over the
+            canonical message {"nonce":...,"public_key":...}. Required unless
+            AXIS_ALLOW_MOCK=1.
+        nonce:
+          type: string
+          description: Nonce bound into the proof-of-possession message.
 
     ProvisioningResponse:
       type: object
@@ -424,8 +457,9 @@ components:
           type: string
           description: |
             Decision reason: `ok`, `device_not_registered`, `signature_invalid`,
-            `unsupported_algo`, `mock_disabled`, `max_power_exceeded`,
-            `below_minimum_power`.
+            `unsupported_algo`, `mock_disabled`, `stale_timestamp`,
+            `future_timestamp`, `nonce_replay`, `invalid_timestamp`,
+            `invalid_nonce`, `max_power_exceeded`, `below_minimum_power`.
           example: ok
         max_power_kw:
           type: number

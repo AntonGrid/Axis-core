@@ -27,13 +27,15 @@ standard test run (`pytest -q`). They verify:
    `attestation_id`, `decision` (`allowed`, `reason`, …), `oracle_id`,
    `manifest_ref`, `device_id`, `nonce`, `timestamp`, `signature`.
 
-4. **Examples → schema → API.** `attestation-example.json` and
-   `attestation-example-deny.json` validate against `attestation.schema.json` and
-   round-trip through `POST /oracle/attest` (allowed and denied scenarios).
+4. **Examples → schema.** `attestation-example.json` and
+   `attestation-example-deny.json` validate against `attestation.schema.json`.
+   Because the oracle now verifies real device signatures and enforces
+   freshness/replay, the live API flow is exercised with dynamically signed
+   proofs (the static examples remain illustrative schema documents).
 
-5. **Decision scenarios.** The oracle decision logic is exercised for both
-   outcomes: allowed (`max_power_kw` within limits) and denied
-   (`max_power_exceeded`, `limit_kw` returned).
+5. **Decision scenarios.** The oracle decision logic is exercised for allowed,
+   policy-denied, stale-timestamp, future-timestamp, replay, unregistered-device
+   and invalid-signature outcomes.
 
 6. **Provisioning → Registry flow.** Register → attest → read the device record
    end-to-end.
@@ -119,7 +121,9 @@ Canonical JSON means: keys sorted lexicographically, no whitespace, `,` and `:`
 separators (the form produced by `axis_core.signature_utils.canonical_proof_message`).
 Devices MUST use an equivalent language-agnostic canonical JSON serializer so the
 exact byte string matches. The `payload` object is included as-is (sorted
-recursively by the canonical serializer).
+recursively by the canonical serializer). Floats that are exactly integral
+(e.g. `2.0`) are normalized to integers (`2`) so `2` and `2.0` produce identical
+bytes; all other numbers are serialized as-is.
 
 > **Note on ENRG compatibility.** The ENRG domain profile signs a *binary*
 > message (`device_id || nonce LE || timestamp LE || energy_wh LE`, see
@@ -139,12 +143,61 @@ The `decision.reason` values produced by the oracle:
 | `signature_invalid` | registered device, but the signature is invalid |
 | `unsupported_algo` | unknown `algo` value |
 | `mock_disabled` | `algo = "mock"` used without `AXIS_ALLOW_MOCK` |
+| `stale_timestamp` | proof `timestamp` older than `MAX_PROOF_AGE_SECONDS` (900 s) |
+| `future_timestamp` | proof `timestamp` more than `MAX_CLOCK_SKEW_SECONDS` (300 s) in the future |
+| `nonce_replay` | `nonce` was already used by this `device_id` |
+| `invalid_timestamp` | `timestamp` missing or not a valid ISO 8601 UTC (`Z`) value |
+| `invalid_nonce` | `nonce` missing or empty |
 | `max_power_exceeded` | requested `max_power_kw` above the policy limit (5.0 kW) |
 | `below_minimum_power` | mock path, requested power below 0.1 kW |
 
-Public API semantics are unchanged: the response shape
-(`device_id`, `attestation_id`, `decision`, `oracle_id`) and status codes remain
-the same; only new `reason` values were added.
+The response shape (`device_id`, `attestation_id`, `decision`, `oracle_id`) and
+status codes are unchanged; only new `reason` values were added.
+
+---
+
+### Oracle attestation signature
+
+The oracle **signs** each attestation with its own Ed25519 key (unrelated to any
+device key) to certify the outcome of its verification. The signing key is loaded
+from the `ORACLE_SECRET_KEY` environment variable (Base64-encoded 32-byte seed).
+
+- The canonical message is the canonical JSON of the attestation **without** the
+  `oracle_signature` field (same canonical rules as the proof message).
+- The signature is Base64-encoded raw 64-byte Ed25519.
+- If `ORACLE_SECRET_KEY` is unset and `AXIS_ALLOW_MOCK` is off, the oracle
+  rejects attestation with `503` (`oracle key not configured`). With
+  `AXIS_ALLOW_MOCK=1` and no key, a clearly marked `mock-oracle-signature` stub
+  is used for development only.
+
+### Freshness and replay policy
+
+- **Freshness:** a proof `timestamp` older than `MAX_PROOF_AGE_SECONDS` (900 s)
+  is rejected with `stale_timestamp`; a `timestamp` more than
+  `MAX_CLOCK_SKEW_SECONDS` (300 s) in the future is rejected with
+  `future_timestamp`. Constants live in `axis_core/config.py`.
+- **Replay:** used nonces are tracked per `device_id` in memory
+  (`axis_core/oracle_storage.py`). A repeated nonce is rejected with
+  `nonce_replay`. The nonce is recorded only after the signature is verified, so
+  an attacker cannot "burn" a victim's nonce with an invalid signature.
+
+### Device registration (proof of possession)
+
+`POST /provisioning/register` requires the device to prove it holds the private
+key that matches the public key it registers:
+
+- `public_key` must be Base64-encoded 32-byte Ed25519.
+- `signature` (Base64-encoded 64-byte Ed25519) over the canonical message
+  `{"nonce":...,"public_key":...}` plus a `nonce`.
+- In dev mode (`AXIS_ALLOW_MOCK=1`) the signature may be omitted for tooling.
+
+### Legacy Mode A re-verification
+
+The legacy "full Attestation" mode no longer trusts a pre-built document. The
+embedded `proof` is re-verified through the same decision pipeline and the
+attestation is rebuilt (fresh `decision`, fresh `issued_at`, real
+`oracle_signature`). Unverifiable proofs are rejected with `403` and the
+`reason` in the response body.
 
 ---
 
@@ -156,9 +209,12 @@ Axis Core conforms to the Axis Protocol in the following respects:
   documents;
 - the private key never leaves the device (ADR-0001) — no key material exists in
   the core;
-- the oracle **verifies** device proofs: it checks the registered public key,
-  verifies the Ed25519 signature over the canonical message, and only then
-  applies the policy engine (it never creates device proofs);
+- the oracle **verifies** device proofs (it never creates them): it checks the
+  registered public key, verifies the Ed25519 signature over the canonical
+  message, enforces timestamp freshness and nonce replay protection, applies the
+  policy engine, and then signs the resulting attestation with its own key;
+- device registration requires proof of possession of the device private key
+  (ADR-0001);
 - the Device Registry is the single source of truth for device records
   (ADR-0002);
 - device identity is deterministic and bound to the public key;

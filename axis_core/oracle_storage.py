@@ -5,6 +5,19 @@ from typing import Dict, Any
 _ATTESTATIONS: Dict[str, Dict[str, Any]] = {}
 _REQUESTS: Dict[str, Dict[str, Any]] = {}
 
+#: Nonces already seen per device (replay protection).
+_USED_NONCES: Dict[str, set] = {}
+
+
+def has_nonce(device_id: str, nonce: str) -> bool:
+    """Return True if ``nonce`` was already used by ``device_id``."""
+    return nonce in _USED_NONCES.get(device_id, set())
+
+
+def record_nonce(device_id: str, nonce: str) -> None:
+    """Mark ``nonce`` as used by ``device_id``."""
+    _USED_NONCES.setdefault(device_id, set()).add(nonce)
+
 
 class InMemoryOracleStorage:
     """

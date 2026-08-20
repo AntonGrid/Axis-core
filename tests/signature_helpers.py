@@ -1,14 +1,43 @@
 """Shared helpers for tests that exercise real Ed25519 device signatures."""
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from nacl.signing import SigningKey
 
-from axis_core.signature_utils import encode_public_key, generate_device_key, sign_proof
+from axis_core.signature_utils import (
+    encode_public_key,
+    generate_device_key,
+    sign_proof,
+    sign_registration,
+)
 
 
-def register_device(client, public_key_b64: str, manifest_ref: Optional[str] = None) -> str:
-    """Register a device and return its deterministic ``device_id``."""
-    body = {"public_key": public_key_b64}
+def now_iso8601_z() -> str:
+    """Return the current UTC time as an ISO 8601 timestamp with a 'Z' suffix."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def iso8601_z_offset_seconds(offset_seconds: int) -> str:
+    """Return an ISO 8601 'Z' timestamp offset from now by ``offset_seconds``."""
+    return (
+        (datetime.now(timezone.utc) + timedelta(seconds=offset_seconds))
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+
+
+def register_device(
+    client,
+    public_key_b64: str,
+    signing_key: Optional[SigningKey] = None,
+    manifest_ref: Optional[str] = None,
+) -> str:
+    """Register a device (with proof-of-possession) and return its ``device_id``."""
+    body: Dict[str, Any] = {"public_key": public_key_b64}
+    if signing_key is not None:
+        nonce = "reg-" + public_key_b64[:16]
+        body["nonce"] = nonce
+        body["signature"] = sign_registration(signing_key, public_key_b64, nonce)
     if manifest_ref is not None:
         body["manifest_ref"] = manifest_ref
     resp = client.post("/provisioning/register", json=body)
@@ -40,5 +69,6 @@ def make_registered_device(client) -> tuple:
     """Create an Ed25519 keypair and register the device; returns (key, device_id)."""
     key = generate_device_key()
     public_key_b64 = encode_public_key(key)
-    device_id = register_device(client, public_key_b64)
+    device_id = register_device(client, public_key_b64, signing_key=key)
     return key, device_id
+
