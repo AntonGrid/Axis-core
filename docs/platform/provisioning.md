@@ -120,8 +120,11 @@ Check device status.
 
 > **Implementation note:** the current Axis Core reference implementation exposes
 > provisioning through `/provisioning/register` and `/provisioning/attest`
-> (see `API.md`). The `/identity/*` endpoints above describe the protocol-level
-> API (see Axis-protocol `docs/platform/provisioning.md`).
+> (see `API.md`). `/provisioning/register` enforces proof-of-possession: the
+> `public_key` must be a Base64-encoded 32-byte Ed25519 key and a `signature`
+> over `{"nonce":...,"public_key":...}` proves key ownership (skippable only with
+> `AXIS_ALLOW_MOCK=1`). The `/identity/*` endpoints above describe the
+> protocol-level API (see Axis-protocol `docs/platform/provisioning.md`).
 
 ---
 

@@ -12,6 +12,9 @@ services:
     environment:
       # Dev-only mock signatures are OFF by default.
       - AXIS_ALLOW_MOCK=${AXIS_ALLOW_MOCK:-}
+      # Required in strict mode: Base64-encoded 32-byte Ed25519 seed. Without
+      # it (and without AXIS_ALLOW_MOCK) the oracle rejects attestation with 503.
+      - ORACLE_SECRET_KEY=${ORACLE_SECRET_KEY:-}
 
   registry:
     build: ./oracle/registry
@@ -19,4 +22,5 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - REGISTRY_ADMIN_KEY=${REGISTRY_ADMIN_KEY:-secure-key}
+      # Required. The registry exits if this is unset (see oracle/registry/README.md).
+      - REGISTRY_ADMIN_KEY=${REGISTRY_ADMIN_KEY:-}

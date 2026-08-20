@@ -16,6 +16,8 @@ DEVICE_PROOF_VALIDATOR = get_validator("device_proof")
 class ProvisioningRequest(BaseModel):
     public_key: str
     manifest_ref: str | None = None
+    signature: str | None = None
+    nonce: str | None = None
     proof: dict | None = None  # will be linked with JSON Schema later
 
 

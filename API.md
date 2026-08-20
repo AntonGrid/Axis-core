@@ -40,9 +40,15 @@ the assigned `manifest_ref`, and the bootstrap policy.
 ```json
 {
   "public_key": "<base64-ed25519-public-key>",
-  "manifest_ref": "manifest:v0-placeholder"
+  "manifest_ref": "manifest:v0-placeholder",
+  "signature": "<base64-ed25519-signature>",
+  "nonce": "<nonce>"
 }
 ```
+
+`signature` is the Base64-encoded Ed25519 proof-of-possession over the canonical
+message `{"nonce":...,"public_key":...}`. In dev mode (`AXIS_ALLOW_MOCK=1`) the
+`signature`/`nonce` may be omitted.
 
 **Response (200):**
 
@@ -57,7 +63,8 @@ the assigned `manifest_ref`, and the bootstrap policy.
 }
 ```
 
-**Error (400):** `public_key` is required.
+**Error (400):** missing/invalid `public_key`, missing proof-of-possession
+(`signature` + `nonce`), or an invalid PoP signature.
 
 ### 2.2. `POST /provisioning/attest`
 
@@ -127,7 +134,10 @@ The oracle endpoint works in two modes.
 #### Mode A: Full Attestation (legacy)
 
 Accepts a complete Attestation document, validates it against
-`attestation.schema.json`, stores it in memory, and returns a summary.
+`attestation.schema.json`, then **re-verifies the embedded device proof**
+(signature + freshness/replay + policy). The attestation is re-signed by the
+oracle and stored only if the proof is valid. Unverifiable proofs are rejected
+with `403` and a `reason`.
 
 **Request:**
 
@@ -156,6 +166,9 @@ Accepts a complete Attestation document, validates it against
 ```
 
 **Error (400):** schema validation error (`"Validation error: ..."`).
+
+**Error (403):** the embedded proof is unverifiable — response body
+`{"detail": {"reason": "<reason>"}}`.
 
 #### Mode B: Attestation request (new format)
 
@@ -193,8 +206,13 @@ applies the decision logic (a mock policy engine).
 ```
 
 **Decision reasons:** `ok`, `device_not_registered`, `signature_invalid`,
-`unsupported_algo`, `mock_disabled`, `max_power_exceeded`,
+`unsupported_algo`, `mock_disabled`, `stale_timestamp`, `future_timestamp`,
+`nonce_replay`, `invalid_timestamp`, `invalid_nonce`, `max_power_exceeded`,
 `below_minimum_power` (see `docs/conformance.md`).
+
+The oracle signs each attestation with its own Ed25519 key loaded from
+`ORACLE_SECRET_KEY` (Base64-encoded 32-byte seed). If it is unset and
+`AXIS_ALLOW_MOCK` is off, the endpoint returns `503`.
 
 **Errors (400):**
 

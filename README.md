@@ -73,15 +73,26 @@ cd oracle/registry && npm install && cd ../..
 ### Run the backend
 
 ```bash
-uvicorn axis_core.main:app --reload --port 8000
+ORACLE_SECRET_KEY=<base64-32-byte-ed25519-seed> uvicorn axis_core.main:app --reload --port 8000
+```
+
+`ORACLE_SECRET_KEY` is **required** in strict mode: the oracle signs attestations
+with this key. Without it (and without `AXIS_ALLOW_MOCK=1`) attestation returns
+`503`. Generate a key with:
+
+```bash
+python -c "import nacl.signing, base64; print(base64.b64encode(bytes(nacl.signing.SigningKey.generate())).decode())"
 ```
 
 ### Run the Manifest Registry (optional)
 
 ```bash
 cd oracle/registry
-REGISTRY_ADMIN_KEY=secure-key node server.js
+REGISTRY_ADMIN_KEY=your-admin-key node server.js
 ```
+
+> `REGISTRY_ADMIN_KEY` is **required** — the registry exits if it is unset
+> (it guards `POST /api/v1/merkle/snapshot`). See `oracle/registry/README.md`.
 
 ### Run with Docker Compose (optional)
 
@@ -126,13 +137,11 @@ cd oracle/registry && npm test
    # => {"status": "ok"}
    ```
 
-2. Register a device:
-
-   ```bash
-   curl -X POST http://localhost:8000/provisioning/register \
-     -H 'Content-Type: application/json' \
-     -d '{"public_key": "test-public-key-1"}'
-   ```
+2. Register a device. Registration requires **proof of possession**: a
+   Base64-encoded 32-byte Ed25519 `public_key`, a `nonce`, and a `signature`
+   over the canonical message `{"nonce":...,"public_key":...}` (see
+   [docs/conformance.md](./docs/conformance.md)). The demo script in step 3
+   generates a key, registers a device, and signs a proof end-to-end.
 
 3. Submit a signed device proof to the oracle (real Ed25519 flow via the demo script —
    it generates a key, registers the device, and signs the proof):
@@ -141,10 +150,13 @@ cd oracle/registry && npm test
    python scripts/full_oracle_onchain_demo.py
    ```
 
-   > **Note:** the oracle now verifies Ed25519 signatures. A device must be
-   > registered first, and `proof.signature` must be valid over the canonical
-   > message (see [docs/conformance.md](./docs/conformance.md)). The legacy
-   > `mock` algorithm is a dev-only mode enabled with `AXIS_ALLOW_MOCK=1`.
+   > **Note:** the oracle now verifies Ed25519 signatures, enforces timestamp
+   > freshness (max age 900 s, max future skew 300 s) and nonce replay
+   > protection, and signs the resulting attestation with its own Ed25519 key.
+   > A device must be registered first, and `proof.signature` must be valid over
+   > the canonical message (see [docs/conformance.md](./docs/conformance.md)).
+   > The legacy `mock` algorithm is a dev-only mode enabled with
+   > `AXIS_ALLOW_MOCK=1`.
 
 4. Explore the full attestation → on-chain mapping demos:
 
