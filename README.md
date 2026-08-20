@@ -127,6 +127,40 @@ cd oracle/registry && npm test
 ./run-tests.sh
 ```
 
+## Storage backends
+
+Axis Core ships with a small storage abstraction (`axis_core/storage/`). Select
+it with the `AXIS_STORAGE_BACKEND` environment variable:
+
+| Backend | Nonces | Device registry | Requires |
+| --- | --- | --- | --- |
+| `memory` (default) | in-process | in-process | nothing |
+| `redis` | Redis `SET NX EX` (TTL = `MAX_PROOF_AGE_SECONDS`) | Redis | `REDIS_URL` |
+| `postgres` | Postgres table `axis_nonces` | Postgres table `axis_devices` | `DATABASE_URL` |
+| `hybrid` | Redis | Postgres | `REDIS_URL` + `DATABASE_URL` |
+
+Install the optional dependencies for durable backends:
+
+```bash
+pip install -r requirements-storage.txt
+```
+
+Run the stack (with Redis + PostgreSQL) via Docker Compose:
+
+```bash
+AXIS_STORAGE_BACKEND=hybrid docker compose up --build
+```
+
+Integration tests for Redis/PostgreSQL are skipped unless `REDIS_URL` /
+`DATABASE_URL` are set (see `tests/test_storage.py`). The default test suite
+always runs on the `memory` backend, so it needs no external services.
+
+> Note: the `memory` backend is process-local — it is not shared between
+> workers and loses data on restart. It is intended for tests and demos.
+
+---
+
+
 ---
 
 ## Quick Start

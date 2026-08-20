@@ -1,10 +1,10 @@
 from typing import Dict, Optional
 
-from .provisioning_service import _DB, RegisteredDevice
+from axis_core.storage.factory import get_backend
 
 
 def get_device_record(device_id: str) -> Optional[Dict]:
-    dev: RegisteredDevice | None = _DB.get(device_id)
+    dev = get_backend().get_device(device_id)
     if not dev:
         return None
 
@@ -16,3 +16,4 @@ def get_device_record(device_id: str) -> Optional[Dict]:
         "firmware_version": None,
         "manifest_ref": dev.manifest_ref,
     }
+

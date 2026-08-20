@@ -4,7 +4,8 @@ from typing import Dict, Any
 
 from jsonschema import ValidationError
 
-from axis_core.services.provisioning_service import register_device, _DB
+from axis_core.services.provisioning_service import register_device
+from axis_core.storage.factory import get_backend
 from axis_core.schema_utils import get_validator
 
 
@@ -58,7 +59,7 @@ async def provisioning_attest(proof: Dict[str, Any]):
         )
 
     device_id = proof.get("device_id")
-    if device_id not in _DB:
+    if get_backend().get_device(device_id) is None:
         # Special case: device not registered
         raise HTTPException(
             status_code=400,

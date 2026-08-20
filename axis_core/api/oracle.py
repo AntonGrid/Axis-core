@@ -11,11 +11,9 @@ from axis_core.oracle_keys import sign_attestation
 from axis_core.oracle_storage import (
     _ATTESTATIONS,
     _REQUESTS,
-    has_nonce,
-    record_nonce,
 )
 from axis_core.schema_utils import validate_payload
-from axis_core.services.provisioning_service import _DB
+from axis_core.storage.factory import get_backend
 from axis_core.signature_utils import canonical_proof_message, verify_ed25519_signature
 
 router = APIRouter(prefix="/oracle", tags=["oracle"])
@@ -112,7 +110,7 @@ def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
     # 2. The device MUST be registered (registry = source of truth).
     device = None
     if algo == "ed25519":
-        device = _DB.get(device_id)
+        device = get_backend().get_device(device_id)
         if device is None:
             return _decision(False, "device_not_registered", 0.0)
 
@@ -144,9 +142,9 @@ def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
     nonce = request.get("nonce")
     if not isinstance(nonce, str) or not nonce:
         return _decision(False, "invalid_nonce", 0.0)
-    if has_nonce(device_id, nonce):
+    if get_backend().has_nonce(device_id, nonce):
         return _decision(False, "nonce_replay", 0.0)
-    record_nonce(device_id, nonce)
+    get_backend().record_nonce(device_id, nonce)
 
     # 6. Mock Policy Engine.
     if max_power_kw > 5.0:

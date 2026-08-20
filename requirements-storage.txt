@@ -1,0 +1,8 @@
+# Optional dependencies for production storage backends (Axis Core).
+# Not installed by default — the core runs with the in-memory backend out of
+# the box. Install this file when you plan to use:
+#   AXIS_STORAGE_BACKEND=redis   -> needs redis
+#   AXIS_STORAGE_BACKEND=postgres -> needs psycopg
+#   AXIS_STORAGE_BACKEND=hybrid   -> needs both
+redis>=5.0
+psycopg[binary]>=3.1

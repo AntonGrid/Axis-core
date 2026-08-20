@@ -1,5 +1,4 @@
 import hashlib
-from dataclasses import dataclass
 from typing import Dict
 
 from axis_core.config import mock_mode_enabled
@@ -8,17 +7,8 @@ from axis_core.signature_utils import (
     is_valid_public_key_b64,
     verify_ed25519_signature,
 )
-
-
-@dataclass
-class RegisteredDevice:
-    device_id: str
-    public_key: str
-    manifest_ref: str
-    bootstrap_policy: Dict
-
-
-_DB: Dict[str, RegisteredDevice] = {}
+from axis_core.storage.factory import get_backend
+from axis_core.storage.models import RegisteredDevice
 
 
 def _generate_device_id(public_key: str) -> str:
@@ -52,11 +42,13 @@ def register_device(req) -> Dict:
         "max_power_kw": 3.5,
     }
 
-    _DB[device_id] = RegisteredDevice(
-        device_id=device_id,
-        public_key=public_key,
-        manifest_ref=manifest_ref,
-        bootstrap_policy=bootstrap_policy,
+    get_backend().put_device(
+        RegisteredDevice(
+            device_id=device_id,
+            public_key=public_key,
+            manifest_ref=manifest_ref,
+            bootstrap_policy=bootstrap_policy,
+        )
     )
 
     return {
