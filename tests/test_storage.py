@@ -69,6 +69,26 @@ def test_memory_reset_clears_state():
     assert backend.has_nonce(_DEVICE.device_id, "n1") is False
 
 
+def test_memory_attestation_roundtrip():
+    backend = _fresh_memory()
+    assert backend.get_attestation("att_1") is None
+    backend.put_attestation("att_1", {"device_id": "dev_x", "decision": {"allowed": True}})
+    got = backend.get_attestation("att_1")
+    assert got is not None and got["decision"]["allowed"] is True
+    all_atts = backend.all_attestations()
+    assert set(all_atts.keys()) == {"att_1"}
+
+
+def test_memory_request_roundtrip():
+    backend = _fresh_memory()
+    backend.put_request("req_1", {"request": {"device_id": "dev_x"}, "attestation_id": "att_1"})
+    got = backend.get_request("req_1")
+    assert got is not None and got["attestation_id"] == "att_1"
+    assert set(backend.all_requests().keys()) == {"req_1"}
+    backend.reset()
+    assert backend.get_request("req_1") is None
+
+
 def test_factory_defaults_to_memory(monkeypatch):
     monkeypatch.delenv("AXIS_STORAGE_BACKEND", raising=False)
     reset_backend()

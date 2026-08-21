@@ -31,6 +31,16 @@ CREATE TABLE IF NOT EXISTS axis_nonces (
     seen_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (device_id, nonce)
 );
+CREATE TABLE IF NOT EXISTS axis_attestations (
+    attestation_id TEXT PRIMARY KEY,
+    data           JSONB NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS axis_requests (
+    request_id  TEXT PRIMARY KEY,
+    data        JSONB NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 
@@ -109,6 +119,56 @@ class PostgresBackend(StorageBackend):
                 (device_id, nonce),
             )
         self._conn.commit()
+
+    # -- attestations -----------------------------------------------------
+    def put_attestation(self, attestation_id: str, attestation) -> None:
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO axis_attestations (attestation_id, data) VALUES (%s, %s) "
+                "ON CONFLICT (attestation_id) DO UPDATE SET data = EXCLUDED.data",
+                (attestation_id, json.dumps(attestation)),
+            )
+        self._conn.commit()
+
+    def get_attestation(self, attestation_id: str):
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT data FROM axis_attestations WHERE attestation_id = %s",
+                (attestation_id,),
+            )
+            row = cur.fetchone()
+        return None if row is None else row[0]
+
+    def all_attestations(self) -> dict:
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT attestation_id, data FROM axis_attestations")
+            rows = cur.fetchall()
+        return {row[0]: row[1] for row in rows}
+
+    # -- oracle requests --------------------------------------------------
+    def put_request(self, request_id: str, request) -> None:
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO axis_requests (request_id, data) VALUES (%s, %s) "
+                "ON CONFLICT (request_id) DO UPDATE SET data = EXCLUDED.data",
+                (request_id, json.dumps(request)),
+            )
+        self._conn.commit()
+
+    def get_request(self, request_id: str):
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT data FROM axis_requests WHERE request_id = %s",
+                (request_id,),
+            )
+            row = cur.fetchone()
+        return None if row is None else row[0]
+
+    def all_requests(self) -> dict:
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT request_id, data FROM axis_requests")
+            rows = cur.fetchall()
+        return {row[0]: row[1] for row in rows}
 
     def reset(self) -> None:
         # Never wipe a shared database on reset; tests use ``memory``.

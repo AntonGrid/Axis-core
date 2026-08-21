@@ -10,7 +10,6 @@ import base64
 import pytest
 from nacl.signing import SigningKey
 
-from axis_core import oracle_storage
 from axis_core.storage import factory
 
 #: A fixed oracle key for the test run. Its public key can be derived via
@@ -22,8 +21,6 @@ ORACLE_KEY = SigningKey.generate()
 def _reset_axis_state(monkeypatch):
     factory.reset_backend()
     factory.get_backend().reset()
-    oracle_storage._ATTESTATIONS.clear()
-    oracle_storage._REQUESTS.clear()
     monkeypatch.setenv(
         "ORACLE_SECRET_KEY",
         base64.b64encode(bytes(ORACLE_KEY)).decode("ascii"),

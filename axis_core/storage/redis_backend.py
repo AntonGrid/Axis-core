@@ -66,6 +66,46 @@ class RedisBackend(StorageBackend):
     def record_nonce(self, device_id: str, nonce: str) -> None:
         self._r.set(self._nonce_key(device_id, nonce), "1", nx=True, ex=self._ttl)
 
+    # -- attestations -----------------------------------------------------
+    def _att_key(self, attestation_id: str) -> str:
+        return f"axis:att:{attestation_id}"
+
+    def put_attestation(self, attestation_id: str, attestation) -> None:
+        self._r.set(self._att_key(attestation_id), json.dumps(attestation))
+
+    def get_attestation(self, attestation_id: str):
+        raw = self._r.get(self._att_key(attestation_id))
+        return None if raw is None else json.loads(raw)
+
+    def all_attestations(self):
+        # Reference implementation: KEYS is acceptable for demos; a production
+        # deployment should page with SCAN or keep an index.
+        out = {}
+        for key in self._r.keys("axis:att:*"):
+            raw = self._r.get(key)
+            if raw is not None:
+                out[key.split(":", 2)[2]] = json.loads(raw)
+        return out
+
+    # -- oracle requests --------------------------------------------------
+    def _req_key(self, request_id: str) -> str:
+        return f"axis:req:{request_id}"
+
+    def put_request(self, request_id: str, request) -> None:
+        self._r.set(self._req_key(request_id), json.dumps(request))
+
+    def get_request(self, request_id: str):
+        raw = self._r.get(self._req_key(request_id))
+        return None if raw is None else json.loads(raw)
+
+    def all_requests(self):
+        out = {}
+        for key in self._r.keys("axis:req:*"):
+            raw = self._r.get(key)
+            if raw is not None:
+                out[key.split(":", 2)[2]] = json.loads(raw)
+        return out
+
     def reset(self) -> None:
         # Never wipe a shared Redis on reset; tests use ``memory``.
         pass

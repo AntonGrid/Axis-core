@@ -36,6 +36,24 @@ class HybridBackend(StorageBackend):
     def record_nonce(self, device_id: str, nonce: str) -> None:
         self._redis.record_nonce(device_id, nonce)
 
+    def put_attestation(self, attestation_id: str, attestation) -> None:
+        self._postgres.put_attestation(attestation_id, attestation)
+
+    def get_attestation(self, attestation_id: str):
+        return self._postgres.get_attestation(attestation_id)
+
+    def all_attestations(self) -> dict:
+        return self._postgres.all_attestations()
+
+    def put_request(self, request_id: str, request) -> None:
+        self._postgres.put_request(request_id, request)
+
+    def get_request(self, request_id: str):
+        return self._postgres.get_request(request_id)
+
+    def all_requests(self) -> dict:
+        return self._postgres.all_requests()
+
     def reset(self) -> None:
         self._redis.reset()
         self._postgres.reset()

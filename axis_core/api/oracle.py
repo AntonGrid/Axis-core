@@ -8,10 +8,6 @@ from jsonschema import ValidationError
 
 from axis_core.config import MAX_CLOCK_SKEW_SECONDS, MAX_PROOF_AGE_SECONDS, mock_mode_enabled
 from axis_core.oracle_keys import sign_attestation
-from axis_core.oracle_storage import (
-    _ATTESTATIONS,
-    _REQUESTS,
-)
 from axis_core.schema_utils import validate_payload
 from axis_core.storage.factory import get_backend
 from axis_core.signature_utils import canonical_proof_message, verify_ed25519_signature
@@ -239,7 +235,7 @@ async def oracle_attest(payload: Dict[str, Any]) -> Dict[str, Any]:
             "issued_at": now,
         }
         attestation["oracle_signature"] = _sign_or_stub(attestation)
-        _ATTESTATIONS[att_id] = attestation
+        get_backend().put_attestation(att_id, attestation)
 
         return {
             "status": "received",
@@ -261,12 +257,12 @@ async def oracle_attest(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         # Store request and attestation
         request_id = str(uuid4())
-        _REQUESTS[request_id] = {
+        get_backend().put_request(request_id, {
             "request": payload,
             "attestation_id": att_id,
             "created_at": _now_iso8601_z(),
-        }
-        _ATTESTATIONS[att_id] = attestation
+        })
+        get_backend().put_attestation(att_id, attestation)
 
         return {
             "device_id": payload["device_id"],
@@ -288,7 +284,8 @@ async def list_attestations(limit: int = 50, offset: int = 0) -> Dict[str, Any]:
     """
     List stored attestations with pagination.
     """
-    keys = list(_ATTESTATIONS.keys())
+    atts = get_backend().all_attestations()
+    keys = list(atts.keys())
     total = len(keys)
     paginated = keys[offset:offset + limit]
 
@@ -299,8 +296,8 @@ async def list_attestations(limit: int = 50, offset: int = 0) -> Dict[str, Any]:
         "attestations": [
             {
                 "attestation_id": key,
-                "device_id": _ATTESTATIONS[key].get("device_id"),
-                "issued_at": _ATTESTATIONS[key].get("issued_at"),
+                "device_id": atts[key].get("device_id"),
+                "issued_at": atts[key].get("issued_at"),
             }
             for key in paginated
         ],
@@ -312,7 +309,7 @@ async def get_attestation(attestation_id: str) -> Dict[str, Any]:
     """
     Get a specific attestation by ID.
     """
-    att = _ATTESTATIONS.get(attestation_id)
+    att = get_backend().get_attestation(attestation_id)
     if not att:
         raise HTTPException(status_code=404, detail="Attestation not found")
     return att
@@ -323,7 +320,8 @@ async def list_requests(limit: int = 50, offset: int = 0) -> Dict[str, Any]:
     """
     List stored oracle requests.
     """
-    keys = list(_REQUESTS.keys())
+    reqs = get_backend().all_requests()
+    keys = list(reqs.keys())
     total = len(keys)
     paginated = keys[offset:offset + limit]
 
@@ -334,9 +332,9 @@ async def list_requests(limit: int = 50, offset: int = 0) -> Dict[str, Any]:
         "requests": [
             {
                 "request_id": key,
-                "attestation_id": _REQUESTS[key].get("attestation_id"),
-                "created_at": _REQUESTS[key].get("created_at"),
-                "device_id": _REQUESTS[key].get("request", {}).get("device_id"),
+                "attestation_id": reqs[key].get("attestation_id"),
+                "created_at": reqs[key].get("created_at"),
+                "device_id": reqs[key].get("request", {}).get("device_id"),
             }
             for key in paginated
         ],
@@ -348,7 +346,7 @@ async def get_request(request_id: str) -> Dict[str, Any]:
     """
     Get a specific oracle request by ID.
     """
-    req = _REQUESTS.get(request_id)
+    req = get_backend().get_request(request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
     return req
