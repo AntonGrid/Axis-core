@@ -6,8 +6,11 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException
 from jsonschema import ValidationError
 
-from axis_core.config import MAX_CLOCK_SKEW_SECONDS, MAX_PROOF_AGE_SECONDS, mock_mode_enabled
+from axis_core.config import mock_mode_enabled
 from axis_core.oracle_keys import sign_attestation
+from axis_core.policy.config import load_policy_config
+from axis_core.policy.engine import PolicyEngine
+from axis_core.policy.models import OracleReport, PolicyRegistry, ProducerState
 from axis_core.schema_utils import validate_payload
 from axis_core.storage.factory import get_backend
 from axis_core.signature_utils import canonical_proof_message, verify_ed25519_signature
@@ -78,17 +81,34 @@ def _sign_or_stub(attestation: Dict[str, Any]) -> str:
     )
 
 
+def _policy_config() -> PolicyRegistry:
+    """The active policy set (env > policy config file > defaults).
+
+    Reloaded on every call so runtime changes of ``AXIS_POLICY_*`` take effect
+    without a restart — appropriate for the reference service.
+    """
+    return load_policy_config()
+
+
 def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
     """Compute the oracle decision for an attestation request.
 
-    Order of checks:
+    Responsibilities are split per ADR-0003:
+
+    **Verifier** (executor — cryptography and data transport):
       1. algorithm support (``ed25519`` required by default; ``mock`` is a
          documented dev-only mode);
       2. device registration (the registry is the source of truth, ed25519 only);
-      3. timestamp freshness (``stale_timestamp`` / ``future_timestamp``);
-      4. Ed25519 signature verification against the registered public key;
-      5. nonce replay protection (``nonce_replay``);
-      6. mock Policy Engine rules on ``max_power_kw``.
+      3. Ed25519 signature verification against the registered public key;
+      4. nonce replay protection (``nonce_replay``).
+
+    **Policy Engine** (the single decision point — ``axis_core.policy``):
+      5. timestamp freshness (``stale_timestamp`` / ``future_timestamp``),
+         device state, tier/energy limits (configurable, defaults relaxed for
+         the reference service — see ``axis_core.policy.config``);
+
+    **Domain policy** (provisioning profile, ADR-0006):
+      6. ``max_power_kw`` limit (``max_power_exceeded`` / ``below_minimum_power``).
 
     The decision dict always contains ``allowed``, ``reason`` and
     ``max_power_kw``; a ``limit_kw`` field is added for policy denials.
@@ -97,6 +117,7 @@ def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
     algo = request.get("algo", "ed25519")
     max_power_kw = request.get("payload", {}).get("max_power_kw", 0.0)
 
+    # ── Verifier (ADR-0003): cryptography and transport only ─────────────────
     # 1. Algorithm support.
     if algo not in ("ed25519", "mock"):
         return _decision(False, "unsupported_algo", 0.0)
@@ -110,18 +131,7 @@ def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
         if device is None:
             return _decision(False, "device_not_registered", 0.0)
 
-    # 3. Timestamp freshness (both algorithms).
-    try:
-        ts_epoch = _timestamp_to_epoch(request["timestamp"])
-    except (KeyError, TypeError, ValueError):
-        return _decision(False, "invalid_timestamp", 0.0)
-    now_epoch = int(datetime.now(timezone.utc).timestamp())
-    if ts_epoch > now_epoch + MAX_CLOCK_SKEW_SECONDS:
-        return _decision(False, "future_timestamp", 0.0)
-    if now_epoch - ts_epoch > MAX_PROOF_AGE_SECONDS:
-        return _decision(False, "stale_timestamp", 0.0)
-
-    # 4. Verify the device signature over the canonical message (ed25519).
+    # 3. Verify the device signature over the canonical message (ed25519).
     if algo == "ed25519":
         try:
             signature_valid = verify_ed25519_signature(
@@ -134,7 +144,7 @@ def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
         if not signature_valid:
             return _decision(False, "signature_invalid", 0.0)
 
-    # 5. Nonce replay protection.
+    # 4. Nonce replay protection.
     nonce = request.get("nonce")
     if not isinstance(nonce, str) or not nonce:
         return _decision(False, "invalid_nonce", 0.0)
@@ -142,7 +152,30 @@ def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
         return _decision(False, "nonce_replay", 0.0)
     get_backend().record_nonce(device_id, nonce)
 
-    # 6. Mock Policy Engine.
+    # ── Policy Engine (ADR-0003): every admissibility decision ───────────────
+    try:
+        ts_epoch = _timestamp_to_epoch(request["timestamp"])
+    except (KeyError, TypeError, ValueError):
+        return _decision(False, "invalid_timestamp", 0.0)
+    now_epoch = int(datetime.now(timezone.utc).timestamp())
+
+    report = OracleReport(
+        device_id=device_id,
+        nonce=0,
+        device_timestamp=ts_epoch,
+        verified_at=ts_epoch,
+        energy_wh=0,
+    )
+    decision = PolicyEngine.evaluate_preamble(
+        policy=_policy_config(),
+        producer=ProducerState(device_id=device_id),
+        report=report,
+        now=now_epoch,
+    )
+    if not decision.allowed:
+        return _decision(False, decision.reason, 0.0)
+
+    # ── Domain policy (provisioning profile, ADR-0006): power limit ──────────
     if max_power_kw > 5.0:
         return _decision(False, "max_power_exceeded", 5.0, limit_kw=5.0)
     if algo == "mock" and max_power_kw < 0.1:

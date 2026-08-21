@@ -10,6 +10,11 @@
 This repository contains the **platform-agnostic** executable parts of the Axis stack:
 
 - **Core services** — Provisioning, Device Registry, Oracle (attestation decision) logic
+- **Policy Engine** — a single decision point for Proof admissibility (ADR-0003),
+  mirroring the on-chain ENRG `PolicyEngine` (`docs/policy-engine.md`)
+- **Trust Envelope wire format** — deterministic, versioned, signed-as-a-whole
+  envelopes (`axis_core.wire`, `spec/protocol/wire-format.md`)
+- **SDK** — a thin Python client with envelope support (`axis_core.sdk`, see `sdk/README.md`)
 - **Manifest Registry** — a reference service for signed device manifests and Merkle snapshots
 - **Schemas & validation** — canonical JSON Schemas and runtime validation
 - **Developer tooling** — demo scripts, tests, and examples
@@ -29,6 +34,9 @@ Axis-core/
 │   ├── main.py             # FastAPI application entry point
 │   ├── adapters/          # Chain adapters (evm.py = EVM domain adapter)
 │   ├── onchain_bridge.py  # Deprecated re-export → use adapters.evm
+│   ├── policy/             # Policy Engine (ADR-0003) — single decision point
+│   ├── wire/               # Trust Envelope wire format (spec/protocol/wire-format.md)
+│   ├── sdk/                # Python SDK client (register, proofs, envelopes)
 │   ├── oracle_storage.py   # In-memory oracle storage
 │   ├── schema_utils.py     # JSON Schema loading / validation helpers
 │   └── schemas_loader.py   # Attestation schema loader
@@ -38,7 +46,9 @@ Axis-core/
 ├── scripts/                # Demo and utility scripts
 ├── tests/                  # pytest test suite
 ├── docs/                   # Implementation-specific documentation
+│   └── policy-engine.md    # Policy Engine semantics and on-chain parity
 ├── adr/                    # Implementation-level ADRs
+├── sdk/                    # SDK documentation and usage examples
 ├── openapi.yaml            # OpenAPI description of the public API
 ├── API.md                  # API overview
 ├── SCHEMAS.md              # JSON Schema reference

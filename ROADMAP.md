@@ -28,12 +28,17 @@ The long-term goal is to establish Axis Core as the foundational runtime for any
 
 - Device Registry service ✅ (provisioning → registry reference flow)
 - Provisioning service ✅ (register + attest reference flow)
-- Policy Engine implementation 🔶 (mock rules active: `max_power_kw` allow/deny)
-- Oracle / Verifier implementation ✅ (Ed25519 device signature verification)
-- SDK for Python ⬜
+- Policy Engine implementation ✅ (`axis_core.policy`, ADR-0003 — mirrors the
+  on-chain `PolicyEngine`; see `docs/policy-engine.md`)
+- Oracle / Verifier implementation ✅ (Ed25519 device signature verification,
+  ADR-0003 split: Verifier = cryptography, Policy Engine = decisions)
+- Trust Envelope wire format ✅ (`axis_core.wire` — deterministic, versioned,
+  signed as a whole; `spec/protocol/wire-format.md`)
+- SDK for Python ✅ (`axis_core.sdk` + `sdk/README.md`)
 - SDK for TypeScript ⬜
 - REST API ✅ (9 endpoints, documented in `openapi.yaml`)
-- Developer documentation ✅ (API.md, SCHEMAS.md, docs/conformance.md)
+- Developer documentation ✅ (API.md, SCHEMAS.md, docs/conformance.md,
+  docs/policy-engine.md)
 
 **Status:** In Progress
 
@@ -51,7 +56,8 @@ The long-term goal is to establish Axis Core as the foundational runtime for any
 
 ## Phase 4 — Production Readiness
 
-- Independent security audit
+- Independent security audit 🔶 (package ready: `docs/security-audit-guide.md`;
+  execution requires an external organization)
 - Performance testing
 - Formal verification (selected components)
 - Production-ready documentation

@@ -40,6 +40,17 @@ standard test run (`pytest -q`). They verify:
 6. **Provisioning → Registry flow.** Register → attest → read the device record
    end-to-end.
 
+7. **Policy Engine (ADR-0003).** The oracle decision pipeline is split between
+   the Verifier (cryptography) and the Policy Engine (`axis_core.policy`),
+   which mirrors the on-chain `PolicyEngine` of the ENRG reference
+   implementation. `tests/test_policy_engine.py` mirrors the on-chain unit
+   tests (mint pause, oracle whitelist, device-state gating, freshness,
+   tier limits, energy caps, supply cap).
+
+8. **Trust Envelope (wire format).** `tests/test_wire.py` pins the codec
+   guarantees: deterministic serialization, signature over the entire
+   envelope, tamper detection, structural validation.
+
 ---
 
 ## 2. Known deviations and gaps
@@ -72,8 +83,15 @@ The registry stores the simplified set for the reference flow.
 ### 2.4. Wire format
 
 The protocol defines a binary **Trust Envelope** (`spec/protocol/wire-format.md`).
-The current reference implementation exposes a JSON REST API. A binary envelope
-codec is not implemented yet.
+Axis Core now implements a **Trust Envelope codec** (`axis_core.wire`): the
+envelope (envelope header + message header + payload) is serialized as
+canonical JSON and signed as a whole with Ed25519. The codec is
+deterministic, versioned and self-describing.
+
+Known limitation: the current codec is **JSON-based**, not the binary codec
+outlined in the specification. Binary encoding (`u8/u16/u32` big-endian,
+length-prefixed strings) is a future implementation detail and does not affect
+the trust properties (determinism, whole-envelope signature, versioning).
 
 ### 2.5. Provisioning API naming
 
@@ -218,6 +236,13 @@ Axis Core conforms to the Axis Protocol in the following respects:
 - the Device Registry is the single source of truth for device records
   (ADR-0002);
 - device identity is deterministic and bound to the public key;
+- the oracle decision pipeline follows ADR-0003: the **Verifier** performs the
+  cryptography (signature, nonce, registration) and the **Policy Engine**
+  (`axis_core.policy`) makes every admissibility decision, mirroring the
+  on-chain `PolicyEngine` of the ENRG reference implementation;
+- messages can be carried in the **Trust Envelope** wire format
+  (`axis_core.wire`): deterministic, versioned, signed as a whole — identity,
+  integrity and non-repudiation per `spec/protocol/wire-format.md`;
 - the core is platform- and domain-agnostic (no blockchain or domain artifacts).
 
 See the conformance tests in `tests/test_conformance.py` for the exact checks.
