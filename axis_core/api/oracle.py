@@ -6,6 +6,7 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException
 from jsonschema import ValidationError
 
+from axis_core.ai import SignalProvider
 from axis_core.config import mock_mode_enabled
 from axis_core.oracle_keys import sign_attestation
 from axis_core.policy.config import load_policy_config
@@ -90,6 +91,48 @@ def _policy_config() -> PolicyRegistry:
     return load_policy_config()
 
 
+def _ai_history(request: Dict[str, Any]) -> list:
+    """Chronological history for the AI anomaly signal.
+
+    Past attestations of the device (from the registry storage) plus the
+    current report as the last element, so a spike is visible immediately.
+    Only the fields the anomaly detector understands are kept (``nonce``,
+    ``max_power_kw``; ``energy_wh`` arrives with the energy attestation API).
+    """
+    device_id = request["device_id"]
+    history = []
+
+    for att in get_backend().all_attestations().values():
+        if att.get("device_id") != device_id:
+            continue
+        proof = att.get("proof") or {}
+        entry: Dict[str, Any] = {}
+        nonce = proof.get("nonce")
+        if nonce is not None:
+            try:
+                entry["nonce"] = int(nonce)
+            except (TypeError, ValueError):
+                pass
+        power = (proof.get("payload") or {}).get("max_power_kw")
+        if power is not None:
+            entry["max_power_kw"] = float(power)
+        history.append(entry)
+
+    # Current report goes last (it is not persisted yet at decision time).
+    current: Dict[str, Any] = {}
+    nonce = request.get("nonce")
+    if nonce is not None:
+        try:
+            current["nonce"] = int(nonce)
+        except (TypeError, ValueError):
+            pass
+    current["max_power_kw"] = float(request.get("payload", {}).get("max_power_kw", 0.0))
+    history.append(current)
+
+    history.sort(key=lambda e: e.get("nonce", 0))
+    return history[-20:]
+
+
 def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
     """Compute the oracle decision for an attestation request.
 
@@ -166,14 +209,31 @@ def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
         verified_at=ts_epoch,
         energy_wh=0,
     )
+    policy = _policy_config()
     decision = PolicyEngine.evaluate_preamble(
-        policy=_policy_config(),
+        policy=policy,
         producer=ProducerState(device_id=device_id),
         report=report,
         now=now_epoch,
     )
     if not decision.allowed:
         return _decision(False, decision.reason, 0.0)
+
+    # ── AI signals (ENRG-AI, Phase 1): opt-in off-chain gate ─────────────────
+    # Constitution (ADR-0003): the AI oracle is a source of signals, not
+    # decisions. Nothing runs here unless an operator/DAO enabled
+    # ``enforce_ai_anomaly``; the anomaly then rejects the report with the
+    # stable ``ai_anomaly_flagged`` reason.
+    if policy.enforce_ai_anomaly:
+        signal = SignalProvider(
+            anomaly_threshold=policy.ai_anomaly_threshold
+        ).evaluate(
+            device_id=device_id,
+            history=_ai_history(request),
+        )
+        ai_decision = PolicyEngine.evaluate_ai_anomaly(policy=policy, signal=signal)
+        if not ai_decision.allowed:
+            return _decision(False, ai_decision.reason, 0.0)
 
     # ── Domain policy (provisioning profile, ADR-0006): power limit ──────────
     if max_power_kw > 5.0:

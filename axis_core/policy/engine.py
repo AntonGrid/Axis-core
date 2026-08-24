@@ -22,6 +22,8 @@ Reason codes are stable and backward compatible with the oracle API:
 - ``excessive_energy``     (``ExcessiveEnergy``)
 - ``zero_amount_mint``     (``ZeroAmountMint``)
 - ``supply_limit_exceeded`` (``SupplyLimitExceeded``)
+- ``ai_anomaly_flagged``   (off-chain, Phase 1 — ENRG-AI opt-in gate; the
+  on-chain verifier does not know about it, by design)
 """
 from __future__ import annotations
 
@@ -158,5 +160,52 @@ class PolicyEngine:
 
         if enforce_supply and vault_total_supply + reward > vault_max_supply:
             return PolicyDecision(allowed=False, reason="supply_limit_exceeded")
+
+        return PolicyDecision.allowed_ok()
+
+    # ── AI signals (Phase 1, ENRG-AI): off-chain extension ───────────────────
+
+    @staticmethod
+    def evaluate_ai_anomaly(
+        *,
+        policy: Optional[PolicyRegistry],
+        signal: Any,
+        threshold: Optional[float] = None,
+    ) -> PolicyDecision:
+        """Decide whether an AI anomaly signal rejects the report.
+
+        This is an **off-chain, opt-in** gate (``enforce_ai_anomaly``):
+        disabled by default so behavior is unchanged until an operator/DAO
+        turns it on. It is NOT mirrored on-chain — it is an additional,
+        verifiable layer on top of the protocol rules.
+
+        ``signal`` only needs ``is_anomaly`` and ``score`` (duck typing, so
+        the engine does not depend on the AI package): any object with the
+        same shape works. Reason code ``ai_anomaly_flagged`` is stable.
+
+        Returns:
+            ``allowed=False`` with ``reason="ai_anomaly_flagged"`` only when
+            the policy opted in, the signal says ``anomaly``, and the score
+            clears ``threshold`` (default: ``policy.ai_anomaly_threshold``).
+        """
+        enforce = policy.enforce_ai_anomaly if policy else False
+        thr = (
+            threshold
+            if threshold is not None
+            else (policy.ai_anomaly_threshold if policy else 0.6)
+        )
+
+        if not enforce:
+            return PolicyDecision.allowed_ok()
+
+        if getattr(signal, "is_anomaly", False) and signal.score >= thr:
+            return PolicyDecision(
+                allowed=False,
+                reason="ai_anomaly_flagged",
+                details={
+                    "ai_score": signal.score,
+                    "ai_signals": getattr(signal, "details", {}).get("signals", []),
+                },
+            )
 
         return PolicyDecision.allowed_ok()

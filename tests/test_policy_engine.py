@@ -308,3 +308,104 @@ def test_load_policy_sanitizes_parameters():
     with pytest.raises(ValueError):
         load_policy_config(env={"AXIS_POLICY_MAX_CLOCK_SKEW_SEC": "7200"})
 
+
+# ── AI anomaly gate (Phase 1, ENRG-AI): opt-in off-chain extension ────────────
+
+
+def _fake_signal(anomaly: bool, score: float):
+    """A minimal duck-typed signal (the engine must not depend on axis_core.ai)."""
+
+    return type(
+        "_Fake",
+        (),
+        {
+            "is_anomaly": anomaly,
+            "score": score,
+            "details": {"signals": ["power_spike"] if anomaly else []},
+        },
+    )()
+
+
+def test_ai_anomaly_disabled_by_default_allows():
+    policy = _default_policy()  # enforce_ai_anomaly defaults to False
+    decision = PolicyEngine.evaluate_ai_anomaly(
+        policy=policy, signal=_fake_signal(anomaly=True, score=1.0)
+    )
+    assert decision.allowed is True
+    assert decision.reason == "ok"
+
+
+def test_ai_anomaly_none_policy_allows():
+    decision = PolicyEngine.evaluate_ai_anomaly(
+        policy=None, signal=_fake_signal(anomaly=True, score=1.0)
+    )
+    assert decision.allowed is True
+
+
+def test_ai_anomaly_clean_signal_allows_when_enabled():
+    policy = _default_policy()
+    policy.enforce_ai_anomaly = True
+    decision = PolicyEngine.evaluate_ai_anomaly(
+        policy=policy, signal=_fake_signal(anomaly=False, score=0.0)
+    )
+    assert decision.allowed is True
+
+
+def test_ai_anomaly_blocks_spiking_signal_when_enabled():
+    policy = _default_policy()
+    policy.enforce_ai_anomaly = True
+    decision = PolicyEngine.evaluate_ai_anomaly(
+        policy=policy, signal=_fake_signal(anomaly=True, score=1.0)
+    )
+    assert decision.allowed is False
+    assert decision.reason == "ai_anomaly_flagged"
+    assert decision.details["ai_score"] == 1.0
+    assert decision.details["ai_signals"] == ["power_spike"]
+
+
+def test_ai_anomaly_threshold_controls_rejection():
+    policy = _default_policy()
+    policy.enforce_ai_anomaly = True
+    policy.ai_anomaly_threshold = 0.6
+
+    low = PolicyEngine.evaluate_ai_anomaly(
+        policy=policy, signal=_fake_signal(anomaly=True, score=0.4)
+    )
+    assert low.allowed is True
+
+    high = PolicyEngine.evaluate_ai_anomaly(
+        policy=policy, signal=_fake_signal(anomaly=True, score=0.9)
+    )
+    assert high.allowed is False
+
+
+def test_ai_anomaly_explicit_threshold_override():
+    policy = _default_policy()
+    policy.enforce_ai_anomaly = True
+    decision = PolicyEngine.evaluate_ai_anomaly(
+        policy=policy,
+        signal=_fake_signal(anomaly=True, score=0.5),
+        threshold=0.4,
+    )
+    assert decision.allowed is False
+
+
+def test_load_policy_ai_env_overrides():
+    policy = load_policy_config(
+        env={
+            "AXIS_POLICY_ENFORCE_AI_ANOMALY": "true",
+            "AXIS_POLICY_AI_ANOMALY_THRESHOLD": "0.75",
+        }
+    )
+    assert policy.enforce_ai_anomaly is True
+    assert policy.ai_anomaly_threshold == 0.75
+
+
+def test_load_policy_sanitizes_ai_threshold():
+    import pytest
+
+    with pytest.raises(ValueError):
+        load_policy_config(env={"AXIS_POLICY_AI_ANOMALY_THRESHOLD": "1.5"})
+    with pytest.raises(ValueError):
+        load_policy_config(env={"AXIS_POLICY_AI_ANOMALY_THRESHOLD": "abc"})
+

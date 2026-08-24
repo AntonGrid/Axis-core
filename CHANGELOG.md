@@ -10,6 +10,20 @@ The format follows the principles of Keep a Changelog.
 
 ### Added
 
+- **AI signal layer (Phase 1, ENRG-AI)** — `axis_core.ai`: anomaly detection
+  over device history (energy/power spikes vs. median, nonce jumps) and a
+  dependency-free production forecast (least-squares trend). Signals only —
+  decisions stay in the Policy Engine (`docs` rationale: ADR-0003).
+- **AI anomaly policy gate** — new `PolicyRegistry` parameters
+  `enforce_ai_anomaly` / `ai_anomaly_threshold` (off-chain, opt-in) and
+  `PolicyEngine.evaluate_ai_anomaly` with the stable `ai_anomaly_flagged`
+  reason. The oracle consults the signal only when the operator/DAO enables
+  it; default behavior is unchanged.
+- `SignalProvider` — single entry point that combines anomaly + forecast
+  into one `Signal` (neutral no-op without history).
+- Oracle now records recent attestations per device to feed the anomaly
+  history (`_ai_history`).
+
 - Oracle now verifies real Ed25519 device signatures (`POST /oracle/attest`).
 - Canonical signed-message format and Base64 key/signature encoding
   (`axis_core.signature_utils`, documented in `docs/conformance.md`).

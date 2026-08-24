@@ -128,6 +128,12 @@ class PolicyRegistry:
     enforce_tier_limits: bool = True
     enforce_energy_caps: bool = True
     enforce_supply_cap: bool = True
+    #: Off-chain AI-signal switch (Phase 1, ENRG-AI). When enabled the oracle
+    #: consults the AI anomaly signal before minting. NOT mirrored on-chain —
+    #: it is an operator/DAO-level extension on top of the protocol rules.
+    enforce_ai_anomaly: bool = False
+    #: Minimum ``Signal.score`` for an AI anomaly to reject the report.
+    ai_anomaly_threshold: float = 0.6
     max_energy_bps: int = 10_000
     max_clock_skew_sec: int = 300
     version: int = 1

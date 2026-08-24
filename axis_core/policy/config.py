@@ -11,6 +11,8 @@ Environment variables (prefix ``AXIS_POLICY_``):
 - ``AXIS_POLICY_ENFORCE_TIER_LIMITS``    (bool)
 - ``AXIS_POLICY_ENFORCE_ENERGY_CAPS``    (bool)
 - ``AXIS_POLICY_ENFORCE_SUPPLY_CAP``     (bool)
+- ``AXIS_POLICY_ENFORCE_AI_ANOMALY``     (bool, Phase 1 — AI-signal switch)
+- ``AXIS_POLICY_AI_ANOMALY_THRESHOLD``   (float, 0.0 <= v <= 1.0, Phase 1)
 - ``AXIS_POLICY_MAX_ENERGY_BPS``         (int, 0 < v <= 1_000_000)
 - ``AXIS_POLICY_MAX_CLOCK_SKEW_SEC``     (int, 0 <= v <= 3600)
 - ``AXIS_POLICY_FILE``                   (path to a JSON policy config)
@@ -38,6 +40,8 @@ DEFAULT_POLICY = PolicyRegistry(
     enforce_tier_limits=False,
     enforce_energy_caps=False,
     enforce_supply_cap=True,
+    enforce_ai_anomaly=False,
+    ai_anomaly_threshold=0.6,
     max_energy_bps=10_000,
     max_clock_skew_sec=300,
     version=1,
@@ -51,10 +55,14 @@ _BOOL_ENV = {
     "enforce_tier_limits": "AXIS_POLICY_ENFORCE_TIER_LIMITS",
     "enforce_energy_caps": "AXIS_POLICY_ENFORCE_ENERGY_CAPS",
     "enforce_supply_cap": "AXIS_POLICY_ENFORCE_SUPPLY_CAP",
+    "enforce_ai_anomaly": "AXIS_POLICY_ENFORCE_AI_ANOMALY",
 }
 _INT_ENV = {
     "max_energy_bps": "AXIS_POLICY_MAX_ENERGY_BPS",
     "max_clock_skew_sec": "AXIS_POLICY_MAX_CLOCK_SKEW_SEC",
+}
+_FLOAT_ENV = {
+    "ai_anomaly_threshold": "AXIS_POLICY_AI_ANOMALY_THRESHOLD",
 }
 
 
@@ -93,10 +101,19 @@ def load_policy_config(
             except ValueError:
                 raise ValueError(f"{var} must be an integer, got {env[var]!r}") from None
 
+    for key, var in _FLOAT_ENV.items():
+        if env.get(var):
+            try:
+                setattr(policy, key, float(env[var]))
+            except ValueError:
+                raise ValueError(f"{var} must be a float, got {env[var]!r}") from None
+
     # Parameter sanitization (mirrors on-chain update_policy).
     if not (0 < policy.max_energy_bps <= 1_000_000):
         raise ValueError("max_energy_bps must be in (0, 1_000_000]")
     if not (0 <= policy.max_clock_skew_sec <= 3600):
         raise ValueError("max_clock_skew_sec must be in [0, 3600]")
+    if not (0.0 <= policy.ai_anomaly_threshold <= 1.0):
+        raise ValueError("ai_anomaly_threshold must be in [0.0, 1.0]")
 
     return policy

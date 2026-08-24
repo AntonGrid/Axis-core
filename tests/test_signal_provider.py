@@ -1,4 +1,4 @@
-"""Tests for the AI signal layer scaffold (Phase 0)."""
+"""Tests for the AI signal layer (axis_core.ai)."""
 
 from axis_core.ai import Signal, SignalProvider
 
@@ -21,7 +21,32 @@ def test_provider_signature_accepts_future_inputs():
         history=[{"month": "2026-08", "kwh": 30.0}],
         market={"prices": [{"price": 10.0, "ts": 0}]},
     )
-    assert signal.level == "neutral"
+    # History present → informational forecast signal (no anomaly, no data).
+    assert signal.level == "info"
+    assert signal.kind == "forecast"
+    assert signal.is_anomaly is False
+
+
+def test_provider_returns_anomaly_level_on_spike():
+    provider = SignalProvider()
+    history = [{"max_power_kw": 0.5} for _ in range(5)]
+    history[-1] = {"max_power_kw": 4.9}
+    signal = provider.evaluate(device_id="dev_3", history=history)
+    assert signal.level == "anomaly"
+    assert signal.kind == "ai_anomaly"
+    assert signal.is_anomaly is True
+    assert signal.score == 1.0
+    assert "power_spike" in signal.details["anomaly_signals"]
+
+
+def test_provider_returns_info_with_clean_history():
+    provider = SignalProvider()
+    history = [{"energy_wh": 10}, {"energy_wh": 20}, {"energy_wh": 30}]
+    signal = provider.evaluate(device_id="dev_4", history=history)
+    assert signal.level == "info"
+    assert signal.kind == "forecast"
+    assert signal.is_anomaly is False
+    assert signal.details["forecast_wh"] == 40.0
 
 
 def test_signal_shape():
@@ -34,3 +59,4 @@ def test_signal_shape():
 def test_signal_anomaly_flag_only_for_anomaly_level():
     assert Signal(level="info", kind="forecast").is_anomaly is False
     assert Signal(level="warning", kind="market").is_anomaly is False
+
