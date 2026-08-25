@@ -33,6 +33,9 @@ The format follows the principles of Keep a Changelog.
   `ProducerState.trade_enabled` (off-chain, opt-in).
 - **`POST /market/recommend`** — end-to-end API: Recommender → Policy Engine
   → authoritative `trade_decision`.
+- **Premium SELL rule** — the Recommender sells stored energy when the price
+  clears the rolling average (`sell_premium`, `min_sell_storage_ratio`);
+  closes the arbitrage loop used by the DePIN pilot.
 
 - Oracle now verifies real Ed25519 device signatures (`POST /oracle/attest`).
 - Canonical signed-message format and Base64 key/signature encoding

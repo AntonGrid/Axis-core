@@ -83,6 +83,32 @@ def test_confidence_is_bounded():
     assert 0.0 <= rec.confidence <= 1.0
 
 
+def test_sell_stored_when_price_above_average():
+    rec = recommend(
+        forecast_wh=100, storage_wh=800, capacity_wh=1000,
+        price_now=0.15, price_forecast=0.14, avg_price=0.10,
+    )
+    assert rec.action == "SELL"
+    assert rec.volume_wh == 800.0
+
+
+def test_hold_stored_when_price_below_average():
+    rec = recommend(
+        forecast_wh=100, storage_wh=800, capacity_wh=1000,
+        price_now=0.08, price_forecast=0.08, avg_price=0.10,
+    )
+    assert rec.action == "HOLD"
+
+
+def test_premium_sell_requires_enough_storage():
+    rec = recommend(
+        forecast_wh=100, storage_wh=100, capacity_wh=1000,
+        price_now=0.15, price_forecast=0.15, avg_price=0.10,
+    )
+    # 100 Wh < 20% of capacity → no premium SELL; price not rising → HOLD.
+    assert rec.action == "HOLD"
+
+
 def test_to_dict_shape():
     rec = recommend(
         forecast_wh=300, storage_wh=900, capacity_wh=1000,

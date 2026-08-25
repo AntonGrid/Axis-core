@@ -18,6 +18,10 @@ DEFAULT_STORE_THRESHOLD = 1.05
 DEFAULT_MIN_STORAGE_RATIO = 0.2
 #: Buy only when the current price is this much below the recent average.
 DEFAULT_BUY_DISCOUNT = 0.95
+#: Sell stored energy when the price clears the average by this factor.
+DEFAULT_SELL_PREMIUM = 1.02
+#: Minimum stored fraction (of capacity) eligible for a premium SELL.
+DEFAULT_MIN_SELL_STORAGE_RATIO = 0.2
 
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -55,6 +59,8 @@ def recommend(
     store_threshold: float = DEFAULT_STORE_THRESHOLD,
     min_storage_ratio: float = DEFAULT_MIN_STORAGE_RATIO,
     buy_discount: float = DEFAULT_BUY_DISCOUNT,
+    sell_premium: float = DEFAULT_SELL_PREMIUM,
+    min_sell_storage_ratio: float = DEFAULT_MIN_SELL_STORAGE_RATIO,
 ) -> Recommendation:
     """Rank the best market action for the next period.
 
@@ -64,10 +70,12 @@ def recommend(
         capacity_wh: storage capacity (must be > 0).
         price_now: current market price (USD/kWh).
         price_forecast: expected price over the period (USD/kWh).
-        avg_price: recent average price; used for the BUY signal.
+        avg_price: recent average price; used for BUY/SELL-vs-average.
         store_threshold: price growth factor that justifies STORE.
         min_storage_ratio: storage fill fraction considered "low".
         buy_discount: price / avg_price below which buying is attractive.
+        sell_premium: price / avg_price above which stored energy is sold.
+        min_sell_storage_ratio: minimum stored fraction eligible for SELL.
     """
     if capacity_wh <= 0:
         raise ValueError("capacity_wh must be positive")
@@ -87,7 +95,19 @@ def recommend(
             details={"available_wh": available, "capacity_wh": capacity_wh},
         )
 
-    # 2. Price is about to rise and we have something to store — keep it.
+    # 2. Price above the recent average and enough stored — sell it.
+    min_sell = min_sell_storage_ratio * capacity_wh
+    if storage_wh >= min_sell and avg_price > 0 and price_now >= avg_price * sell_premium:
+        premium = price_now / avg_price - 1.0
+        return Recommendation(
+            action="SELL",
+            volume_wh=storage_wh,
+            confidence=_clamp(premium / 0.1),
+            rationale="price above average; sell stored energy",
+            details={"avg_price": round(avg_price, 4), "premium_pct": round(premium * 100, 2)},
+        )
+
+    # 3. Price is about to rise and we have something to store — keep it.
     if price_forecast > price_now * store_threshold and storage_wh > 0:
         rise = price_forecast / price_now - store_threshold
         return Recommendation(
@@ -98,7 +118,7 @@ def recommend(
             details={"price_rise_pct": round((price_forecast / price_now - 1.0) * 100, 2)},
         )
 
-    # 3. Storage is low and energy is cheap — buy to top up.
+    # 4. Storage is low and energy is cheap — buy to top up.
     target = min_storage_ratio * capacity_wh
     if storage_wh < target and avg_price > 0 and price_now < avg_price * buy_discount:
         discount = 1.0 - price_now / avg_price
