@@ -128,6 +128,89 @@ paths:
                     type: string
                     example: Device not found
 
+  /market/recommend:
+    post:
+      summary: Rank a market action and gate it with the trade policy
+      description: |
+        Combines the production forecast, storage and prices into an action
+        (SELL / STORE / BUY / HOLD) via the AI Recommender, then applies the
+        trade gate (device right, volume limits, DAO approval). The
+        recommender only ranks — the `trade_decision` is authoritative.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_id:
+                  type: string
+                  example: dev_1
+                forecast_wh:
+                  type: number
+                  example: 300
+                storage_wh:
+                  type: number
+                  example: 900
+                capacity_wh:
+                  type: number
+                  example: 1000
+                price_now:
+                  type: number
+                  example: 0.10
+                price_forecast:
+                  type: number
+                  example: 0.10
+                avg_price:
+                  type: number
+                  example: 0.10
+                trade_enabled:
+                  type: boolean
+                  example: true
+                dao_approved:
+                  type: boolean
+                  example: false
+              required: [device_id, capacity_wh, price_now]
+      responses:
+        '200':
+          description: Recommendation and the authoritative trade decision
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device_id:
+                    type: string
+                  recommendation:
+                    type: object
+                    properties:
+                      action:
+                        type: string
+                        enum: [SELL, STORE, BUY, HOLD]
+                      volume_wh:
+                        type: number
+                      confidence:
+                        type: number
+                      rationale:
+                        type: string
+                  trade_decision:
+                    type: object
+                    properties:
+                      allowed:
+                        type: boolean
+                      reason:
+                        type: string
+                        enum: [trade_allowed, trade_not_authorized, trade_volume_exceeded, trade_dao_gated]
+        '400':
+          description: Invalid market inputs (e.g. non-positive capacity/price)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+
   /oracle/attest:
     post:
       summary: Oracle attestation decision

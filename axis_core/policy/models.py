@@ -83,6 +83,8 @@ class ProducerState:
     revoked: bool = False
     #: Device rated power (Wh) for the energy cap (domain profile).
     rated_power_wh: int = 10_000
+    #: Market trading right (Phase 3): off-chain, set by the operator/DAO.
+    trade_enabled: bool = False
 
     def effective_month_energy(self, now: int) -> int:
         """Rolling 30-day window; returns 0 when the window has reset."""
@@ -134,6 +136,12 @@ class PolicyRegistry:
     enforce_ai_anomaly: bool = False
     #: Minimum ``Signal.score`` for an AI anomaly to reject the report.
     ai_anomaly_threshold: float = 0.6
+    #: Off-chain market gate (Phase 3): enforce per-device trade limits.
+    enforce_trade_limits: bool = False
+    #: Maximum trade volume (Wh) per action; 0 means "no limit".
+    trade_max_volume_wh: int = 0
+    #: Require DAO approval before any trade executes.
+    trade_requires_dao: bool = False
     max_energy_bps: int = 10_000
     max_clock_skew_sec: int = 300
     version: int = 1

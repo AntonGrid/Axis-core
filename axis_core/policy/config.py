@@ -13,6 +13,9 @@ Environment variables (prefix ``AXIS_POLICY_``):
 - ``AXIS_POLICY_ENFORCE_SUPPLY_CAP``     (bool)
 - ``AXIS_POLICY_ENFORCE_AI_ANOMALY``     (bool, Phase 1 — AI-signal switch)
 - ``AXIS_POLICY_AI_ANOMALY_THRESHOLD``   (float, 0.0 <= v <= 1.0, Phase 1)
+- ``AXIS_POLICY_ENFORCE_TRADE_LIMITS``   (bool, Phase 3 — market gate)
+- ``AXIS_POLICY_TRADE_MAX_VOLUME_WH``    (int, >= 0; 0 = no limit, Phase 3)
+- ``AXIS_POLICY_TRADE_REQUIRES_DAO``     (bool, Phase 3 — DAO gate)
 - ``AXIS_POLICY_MAX_ENERGY_BPS``         (int, 0 < v <= 1_000_000)
 - ``AXIS_POLICY_MAX_CLOCK_SKEW_SEC``     (int, 0 <= v <= 3600)
 - ``AXIS_POLICY_FILE``                   (path to a JSON policy config)
@@ -42,6 +45,9 @@ DEFAULT_POLICY = PolicyRegistry(
     enforce_supply_cap=True,
     enforce_ai_anomaly=False,
     ai_anomaly_threshold=0.6,
+    enforce_trade_limits=False,
+    trade_max_volume_wh=0,
+    trade_requires_dao=False,
     max_energy_bps=10_000,
     max_clock_skew_sec=300,
     version=1,
@@ -56,10 +62,13 @@ _BOOL_ENV = {
     "enforce_energy_caps": "AXIS_POLICY_ENFORCE_ENERGY_CAPS",
     "enforce_supply_cap": "AXIS_POLICY_ENFORCE_SUPPLY_CAP",
     "enforce_ai_anomaly": "AXIS_POLICY_ENFORCE_AI_ANOMALY",
+    "enforce_trade_limits": "AXIS_POLICY_ENFORCE_TRADE_LIMITS",
+    "trade_requires_dao": "AXIS_POLICY_TRADE_REQUIRES_DAO",
 }
 _INT_ENV = {
     "max_energy_bps": "AXIS_POLICY_MAX_ENERGY_BPS",
     "max_clock_skew_sec": "AXIS_POLICY_MAX_CLOCK_SKEW_SEC",
+    "trade_max_volume_wh": "AXIS_POLICY_TRADE_MAX_VOLUME_WH",
 }
 _FLOAT_ENV = {
     "ai_anomaly_threshold": "AXIS_POLICY_AI_ANOMALY_THRESHOLD",
@@ -113,7 +122,9 @@ def load_policy_config(
         raise ValueError("max_energy_bps must be in (0, 1_000_000]")
     if not (0 <= policy.max_clock_skew_sec <= 3600):
         raise ValueError("max_clock_skew_sec must be in [0, 3600]")
-    if not (0.0 <= policy.ai_anomaly_threshold <= 1.0):
+    if not (0 <= policy.ai_anomaly_threshold <= 1.0):
         raise ValueError("ai_anomaly_threshold must be in [0.0, 1.0]")
+    if policy.trade_max_volume_wh < 0:
+        raise ValueError("trade_max_volume_wh must be >= 0")
 
     return policy

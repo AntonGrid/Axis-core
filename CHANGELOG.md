@@ -23,6 +23,16 @@ The format follows the principles of Keep a Changelog.
   into one `Signal` (neutral no-op without history).
 - Oracle now records recent attestations per device to feed the anomaly
   history (`_ai_history`).
+- **Market recommender (Phase 3, step B)** — `axis_core.ai.recommend`: ranks
+  `SELL / STORE / BUY / HOLD` from production forecast + storage + prices
+  (pure function, confidence + rationale).
+- **Trade policy gate** — `PolicyEngine.evaluate_trade` with stable reasons
+  `trade_not_authorized`, `trade_volume_exceeded`, `trade_dao_gated`,
+  `trade_allowed`; new `PolicyRegistry` parameters
+  `enforce_trade_limits` / `trade_max_volume_wh` / `trade_requires_dao` and
+  `ProducerState.trade_enabled` (off-chain, opt-in).
+- **`POST /market/recommend`** — end-to-end API: Recommender → Policy Engine
+  → authoritative `trade_decision`.
 
 - Oracle now verifies real Ed25519 device signatures (`POST /oracle/attest`).
 - Canonical signed-message format and Base64 key/signature encoding

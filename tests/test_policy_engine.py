@@ -409,3 +409,95 @@ def test_load_policy_sanitizes_ai_threshold():
     with pytest.raises(ValueError):
         load_policy_config(env={"AXIS_POLICY_AI_ANOMALY_THRESHOLD": "abc"})
 
+
+# ── Market trade gate (Phase 3): recommendation → authorized action ─────────
+
+
+def _trading_producer(*, trade_enabled: bool = True) -> ProducerState:
+    return ProducerState(
+        device_id="dev_trader",
+        state=DeviceState.ACTIVE,
+        tier=DeviceTier.INDUSTRIAL,
+        month_energy_wh=0,
+        month_start_ts=1_000,
+        trade_enabled=trade_enabled,
+    )
+
+
+def _rec(action: str = "SELL", volume_wh: float = 200.0):
+    from axis_core.ai import Recommendation
+
+    return Recommendation(action=action, volume_wh=volume_wh)
+
+
+def test_trade_rejected_without_device_right():
+    decision = PolicyEngine.evaluate_trade(
+        policy=_default_policy(),
+        recommendation=_rec(),
+        producer=_trading_producer(trade_enabled=False),
+    )
+    assert decision.allowed is False
+    assert decision.reason == "trade_not_authorized"
+
+
+def test_trade_allowed_when_enabled_and_within_limits():
+    policy = _default_policy()
+    decision = PolicyEngine.evaluate_trade(
+        policy=policy,
+        recommendation=_rec(),
+        producer=_trading_producer(),
+    )
+    assert decision.allowed is True
+    assert decision.reason == "trade_allowed"
+    assert decision.details["action"] == "SELL"
+
+
+def test_trade_volume_limit_enforced():
+    policy = _default_policy()
+    policy.enforce_trade_limits = True
+    policy.trade_max_volume_wh = 100
+    decision = PolicyEngine.evaluate_trade(
+        policy=policy,
+        recommendation=_rec(volume_wh=200),
+        producer=_trading_producer(),
+    )
+    assert decision.allowed is False
+    assert decision.reason == "trade_volume_exceeded"
+    assert decision.details["trade_max_volume_wh"] == 100
+
+
+def test_trade_dao_gate():
+    policy = _default_policy()
+    policy.trade_requires_dao = True
+
+    gated = PolicyEngine.evaluate_trade(
+        policy=policy, recommendation=_rec(), producer=_trading_producer(), dao_approved=False
+    )
+    assert gated.allowed is False
+    assert gated.reason == "trade_dao_gated"
+
+    approved = PolicyEngine.evaluate_trade(
+        policy=policy, recommendation=_rec(), producer=_trading_producer(), dao_approved=True
+    )
+    assert approved.allowed is True
+
+
+def test_load_policy_trade_env():
+    policy = load_policy_config(
+        env={
+            "AXIS_POLICY_ENFORCE_TRADE_LIMITS": "true",
+            "AXIS_POLICY_TRADE_MAX_VOLUME_WH": "5000",
+            "AXIS_POLICY_TRADE_REQUIRES_DAO": "true",
+        }
+    )
+    assert policy.enforce_trade_limits is True
+    assert policy.trade_max_volume_wh == 5000
+    assert policy.trade_requires_dao is True
+
+
+def test_load_policy_sanitizes_trade_volume():
+    import pytest
+
+    with pytest.raises(ValueError):
+        load_policy_config(env={"AXIS_POLICY_TRADE_MAX_VOLUME_WH": "-5"})
+

@@ -18,6 +18,7 @@ from axis_core.ai.anomaly import (
     detect_anomaly,
 )
 from axis_core.ai.forecast import ForecastResult, forecast_production
+from axis_core.ai.recommender import Recommendation, recommend
 from axis_core.ai.signal_provider import Signal, SignalProvider
 
 __all__ = [
@@ -27,9 +28,11 @@ __all__ = [
     "SPIKE_FACTOR",
     "AnomalyResult",
     "ForecastResult",
+    "Recommendation",
     "Signal",
     "SignalProvider",
     "detect_anomaly",
     "forecast_production",
+    "recommend",
 ]
 

@@ -209,3 +209,61 @@ class PolicyEngine:
             )
 
         return PolicyDecision.allowed_ok()
+
+    # ── Market gate (Phase 3, ENRG-AI): recommendation → authorized action ──
+
+    @staticmethod
+    def evaluate_trade(
+        *,
+        policy: Optional[PolicyRegistry],
+        recommendation: Any,
+        producer: ProducerState,
+        dao_approved: bool = False,
+        volume_wh: Optional[float] = None,
+    ) -> PolicyDecision:
+        """Decide whether a market recommendation may be executed.
+
+        This is the **off-chain, opt-in** market gate: the Recommender ranks
+        actions, but only a device with the trading right, within volume
+        limits and past any DAO gate may act. ``recommendation`` only needs
+        ``action`` and ``volume_wh`` (duck typing).
+
+        Reason codes (stable):
+        - ``trade_not_authorized`` — device has no trading right;
+        - ``trade_volume_exceeded`` — volume above ``trade_max_volume_wh``;
+        - ``trade_dao_gated``      — DAO approval required but not given;
+        - ``trade_allowed``        — the action may proceed.
+        """
+        # 1. The device must have the trading right.
+        if not producer.trade_enabled:
+            return PolicyDecision(allowed=False, reason="trade_not_authorized")
+
+        volume = volume_wh if volume_wh is not None else float(getattr(recommendation, "volume_wh", 0.0))
+        if volume < 0:
+            volume = 0.0
+
+        # 2. Volume limits.
+        if (
+            policy is not None
+            and policy.enforce_trade_limits
+            and policy.trade_max_volume_wh > 0
+            and volume > policy.trade_max_volume_wh
+        ):
+            return PolicyDecision(
+                allowed=False,
+                reason="trade_volume_exceeded",
+                details={
+                    "volume_wh": round(volume, 2),
+                    "trade_max_volume_wh": policy.trade_max_volume_wh,
+                },
+            )
+
+        # 3. DAO gate.
+        if policy is not None and policy.trade_requires_dao and not dao_approved:
+            return PolicyDecision(allowed=False, reason="trade_dao_gated")
+
+        return PolicyDecision(
+            allowed=True,
+            reason="trade_allowed",
+            details={"action": getattr(recommendation, "action", "HOLD"), "volume_wh": round(volume, 2)},
+        )
