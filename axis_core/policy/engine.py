@@ -115,14 +115,18 @@ class PolicyEngine:
         if now - report.verified_at > DEFAULT_MAX_PROOF_AGE_SEC:
             return PolicyDecision(allowed=False, reason="stale_timestamp")
 
-        # 3b. device_timestamp freshness (audit 2026-09-16) — mirrors the on-chain
-        # check added to `policy_engine.rs`. `verified_at` is the oracle's clock,
-        # `device_timestamp` is the device's own clock; the latter used to be bound
-        # only by the device signature and never range-checked, so a device could
-        # anchor a proof to an arbitrary time. The live pilot's delta is 1..3 s.
-        if report.device_timestamp > now + skew:
+        # 3b. The DEVICE clock is bound to `verified_at`, not to the mint time
+        # (audit 2026-09-16) — mirrors `verify_device_clock` on-chain.
+        #
+        # `verified_at` is the oracle's clock, `device_timestamp` the device's. The
+        # device clock used to be bound only by the device signature, so a device could
+        # anchor a proof to an arbitrary time. Both values come from the same report,
+        # so the check does not depend on when the mint runs: a proof may legitimately
+        # be minted later (retry queue, drain after a restart), and its freshness *at
+        # mint time* is enforced by the `verified_at` check above.
+        if report.device_timestamp > report.verified_at + skew:
             return PolicyDecision(allowed=False, reason="future_timestamp")
-        if now - report.device_timestamp > DEFAULT_MAX_PROOF_AGE_SEC:
+        if report.verified_at - report.device_timestamp > DEFAULT_MAX_PROOF_AGE_SEC:
             return PolicyDecision(allowed=False, reason="stale_timestamp")
 
         # 4. Monthly tier limit (v7.0 §15).
