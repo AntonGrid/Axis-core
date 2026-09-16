@@ -113,9 +113,30 @@ class AxisClient:
         resp = self._request("POST", "/provisioning/register", json=body)
         return resp.json()
 
-    def submit_proof(self, proof: Dict[str, Any]) -> Dict[str, Any]:
-        """Submit a signed proof to the oracle attestation endpoint."""
-        resp = self._request("POST", "/oracle/attest", json=proof)
+    def submit_proof(
+        self,
+        proof: Dict[str, Any],
+        envelope_signing_key: Optional[nacl.signing.SigningKey] = None,
+        envelope_public_key_b64: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Submit a signed proof to the oracle attestation endpoint.
+
+        Plain body by default. When ``envelope_signing_key`` (or
+        ``envelope_public_key_b64``) is given, the proof is wrapped in a signed
+        **Trust Envelope** (`spec/protocol/wire-format.md` §2) and the oracle
+        authenticates the whole envelope — structural validation, issuer binding and
+        the Ed25519 signature — before it looks at the device proof (§8). Both forms
+        are accepted by ``POST /oracle/attest``; the envelope additionally proves who
+        delivered the message on this hop.
+        """
+        body: Any = proof
+        if envelope_signing_key is not None or envelope_public_key_b64 is not None:
+            body = self.wrap_envelope(
+                proof,
+                signing_key=envelope_signing_key,
+                public_key_b64=envelope_public_key_b64,
+            ).to_dict()
+        resp = self._request("POST", "/oracle/attest", json=body)
         return resp.json()
 
     def attestations(self, limit: int = 50, offset: int = 0) -> Dict[str, Any]:

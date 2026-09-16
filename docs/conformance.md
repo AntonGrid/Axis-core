@@ -55,10 +55,20 @@ standard test run (`pytest -q`). They verify:
    runs this repository's `PolicyEngine` against the SHARED vector file
    `ENRG/tests/conformance/policy_vectors.json` — the same file the deployed Rust
    engine is asserted against by `programs/enrg-mvp/tests/policy_conformance.rs`
-   (18 vectors: preamble gates, reward rules, boundary cases). The vectors are
+   (21 vectors: preamble gates incl. the device-clock rule, reward rules, boundary cases). The vectors are
    located through `AXIS_CONFORMANCE_VECTORS` or a sibling `ENRG` checkout; when the
    file is absent the suite skips with an explicit message. `tests/test_policy_engine.py`
    remains as the local, self-contained check of the same rules.
+
+10. **Trust Envelope authenticated on the wire.** `tests/test_envelope_api.py` posts
+    envelopes built by the SDK to `POST /oracle/attest` and pins wire-format §8:
+    structural validation, the Ed25519 signature over the *entire* envelope,
+    `issuer_id` bound to the key registered for the device, and the fact that the
+    wrapped device proof must still pass the normal pipeline. Rejected cases:
+    tampered `message_payload`, an envelope signed by a foreign (even registered)
+    identity, an unsigned envelope, an unknown `envelope_version`, an unknown
+    `message_type`, and `message_header`/`message_payload` timestamp disagreement
+    (401 / 403 / 400).
 
 ---
 
@@ -92,15 +102,31 @@ The registry stores the simplified set for the reference flow.
 ### 2.4. Wire format
 
 The protocol defines a binary **Trust Envelope** (`spec/protocol/wire-format.md`).
-Axis Core now implements a **Trust Envelope codec** (`axis_core.wire`): the
-envelope (envelope header + message header + payload) is serialized as
-canonical JSON and signed as a whole with Ed25519. The codec is
-deterministic, versioned and self-describing.
+Axis Core implements a **Trust Envelope codec** (`axis_core.wire`): the envelope
+(envelope header + message header + payload) is serialized as canonical JSON and
+signed as a whole with Ed25519 — deterministic, versioned, self-describing.
 
-Known limitation: the current codec is **JSON-based**, not the binary codec
-outlined in the specification. Binary encoding (`u8/u16/u32` big-endian,
-length-prefixed strings) is a future implementation detail and does not affect
-the trust properties (determinism, whole-envelope signature, versioning).
+Since 2026-09-16 the codec is no longer library-only: `POST /oracle/attest` accepts an
+envelope and applies §8 (structure → issuer binding → whole-envelope signature)
+**before** any policy logic runs, and `AxisClient.submit_proof(...,
+envelope_signing_key=…)` sends one. See §1.10 and `API.md` §4.1 (Mode C).
+
+Known deviations (documented, not silent):
+
+- the codec is **JSON**, not the binary encoding of §6 (`u8/u16/u32` **big-endian**,
+  length-prefixed strings). The trust properties are unaffected (determinism,
+  whole-envelope signature, versioning), but a constrained device that needs the
+  binary form cannot interoperate without a translation layer — this is the largest
+  open wire-format gap;
+- `message_header.timestamp` is an **ISO 8601 string**, while §6 types `Timestamp` as
+  an `i64` seconds-since-epoch (`message_payload.timestamp` *is* an epoch integer, so
+  the two are cross-checked for agreement on receipt);
+- **framing (§7)**: "delimited records over HTTP" — one envelope per request body, no
+  `MessageLength` prefix. §7 requires each deployment to state its framing strategy;
+  this is that statement;
+- `message_type` is carried as a **string** (`proof` / `attestation` / `claim`)
+  instead of the §4 numeric codes; `MessageType.code` maps to them
+  (0x01 / 0x02 / 0x03).
 
 ### 2.5. Provisioning API naming
 

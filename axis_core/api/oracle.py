@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
@@ -15,6 +15,7 @@ from axis_core.policy.models import OracleReport, PolicyRegistry, ProducerState
 from axis_core.schema_utils import validate_payload
 from axis_core.storage.factory import get_backend
 from axis_core.signature_utils import canonical_proof_message, verify_ed25519_signature
+from axis_core.wire import TrustEnvelope, validate_envelope, verify_envelope
 
 router = APIRouter(prefix="/oracle", tags=["oracle"])
 
@@ -23,6 +24,15 @@ ORACLE_ID = "oracle_main_1"
 
 def _now_iso8601_z() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _epoch_to_iso8601_z(epoch: int) -> str:
+    """Convert Unix epoch seconds to an ISO 8601 UTC string with a 'Z' suffix."""
+    return (
+        datetime.fromtimestamp(int(epoch), tz=timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def _ensure_iso8601_z(ts: str) -> None:
@@ -80,6 +90,112 @@ def _sign_or_stub(attestation: Dict[str, Any]) -> str:
         detail="oracle key not configured: set ORACLE_SECRET_KEY "
         "(Base64-encoded 32-byte Ed25519 seed)",
     )
+
+
+# ── Trust Envelope (wire-format §2, accepted on this endpoint since 2026-09-16) ──
+
+
+def _is_trust_envelope(payload: Any) -> bool:
+    """True when the request body is an L0 Trust Envelope instead of a bare proof."""
+    return isinstance(payload, dict) and {
+        "envelope_version",
+        "message_header",
+        "message_payload",
+    }.issubset(payload.keys())
+
+
+def _unwrap_trust_envelope(envelope_body: Dict[str, Any]) -> Dict[str, Any]:
+    """Authenticate a Trust Envelope and return the device proof it carries.
+
+    Wire-format §8 makes this a **MUST** before a message is accepted: structural
+    validation, then ``issuer_id`` binding, then the Ed25519 signature over the
+    ENTIRE envelope (envelope header + message header + payload). The issuer is
+    checked against the key **on file for the device**, never against a key the
+    sender supplies.
+
+    Failures stay transport-level (they are not policy decisions):
+    - **400** structural violation (unsupported ``envelope_version``, unknown
+      ``message_type``, missing ``issuer_id``/``entity_id``, header/payload
+      timestamp disagreement);
+    - **401** authentication failure (unsigned envelope, bad signature, issuer is
+      not the identity that signed);
+    - **403** the claimed device is not registered (so no key to authenticate with).
+
+    The returned proof still goes through the normal pipeline: the envelope proves
+    *this hop* (who delivered the message), the inner signature proves *the device*.
+    Neither replaces the other.
+    """
+    envelope = TrustEnvelope.from_dict(envelope_body)
+
+    try:
+        validate_envelope(envelope)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"invalid Trust Envelope: {e}")
+
+    if not envelope.signature:
+        raise HTTPException(status_code=401, detail={"reason": "envelope_unsigned"})
+
+    body = envelope.message_payload or {}
+    device_id = body.get("device_id") or envelope.message_header.get("entity_id", "")
+    device = get_backend().get_device(device_id)
+    if device is None:
+        raise HTTPException(status_code=403, detail={"reason": "device_not_registered"})
+
+    if not verify_envelope(envelope, device.public_key):
+        raise HTTPException(
+            status_code=401, detail={"reason": "envelope_signature_invalid"}
+        )
+
+    # The proof body the DEVICE signed: `canonical_proof_message` covers
+    # device_id, nonce, timestamp, algo, payload.
+    header_ts = envelope.message_header.get("timestamp") or ""
+    payload_ts = body.get("timestamp")
+
+    header_epoch: Optional[int] = None
+    if header_ts:
+        try:
+            _ensure_iso8601_z(header_ts)
+            header_epoch = _timestamp_to_epoch(header_ts)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail="Trust Envelope: message_header.timestamp must be an "
+                "ISO 8601 UTC timestamp with a 'Z' suffix",
+            )
+
+    payload_epoch: Optional[int] = None
+    if payload_ts is not None:
+        try:
+            payload_epoch = int(payload_ts)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail="Trust Envelope: message_payload.timestamp must be an "
+                "integer (Unix epoch seconds)",
+            )
+
+    if (
+        header_epoch is not None
+        and payload_epoch is not None
+        and header_epoch != payload_epoch
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Trust Envelope: message_header.timestamp disagrees with "
+            "message_payload.timestamp",
+        )
+
+    timestamp = header_ts or (
+        _epoch_to_iso8601_z(payload_epoch) if payload_epoch is not None else ""
+    )
+    return {
+        "device_id": device_id,
+        "nonce": body.get("nonce", ""),
+        "timestamp": timestamp,
+        "algo": "ed25519",
+        "payload": body.get("event_data", {}),
+        "signature": body.get("signature", ""),
+    }
 
 
 def _policy_config() -> PolicyRegistry:
@@ -287,7 +403,13 @@ async def oracle_attest(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Oracle attestation endpoint.
 
-    Two modes:
+    Accepted bodies:
+
+    0. **Trust Envelope** (`spec/protocol/wire-format.md` §2). The body is
+       authenticated as a whole before any policy logic runs — structure, issuer
+       binding, Ed25519 signature over the entire envelope (§8) — and the device
+       proof it carries is then processed exactly like mode 2. See
+       `_unwrap_trust_envelope` for the failure codes.
     1. Legacy: a full Attestation document. The embedded device proof is
        re-verified through the same decision pipeline (signature + policy) and
        the attestation is re-signed by the oracle. Unverifiable proofs are
@@ -296,6 +418,10 @@ async def oracle_attest(payload: Dict[str, Any]) -> Dict[str, Any]:
        against the registered public key, freshness/replay are enforced, and
        the resulting attestation is signed by the oracle.
     """
+    # Mode 0: L0 Trust Envelope (wire-format §2/§8).
+    if _is_trust_envelope(payload):
+        payload = _unwrap_trust_envelope(payload)
+
     # Mode 1: Legacy full Attestation document.
     if "attestation_id" in payload and "schema_version" in payload:
         try:
