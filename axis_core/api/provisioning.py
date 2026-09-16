@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 from jsonschema import ValidationError
 
-from axis_core.services.provisioning_service import register_device
+from axis_core.services.provisioning_service import attest_device_proof, register_device
 from axis_core.storage.factory import get_backend
 from axis_core.schema_utils import get_validator
 
@@ -60,7 +60,8 @@ async def provisioning_attest(proof: Dict[str, Any]):
 
     device_id = proof.get("device_id")
     if get_backend().get_device(device_id) is None:
-        # Special case: device not registered
+        # Special case: device not registered — the proof is not "denied by policy",
+        # it is not admissible at all, so the documented 400 is kept.
         raise HTTPException(
             status_code=400,
             detail={
@@ -69,10 +70,10 @@ async def provisioning_attest(proof: Dict[str, Any]):
             },
         )
 
-    decision = {
-        "allowed": True,
-        "reason": "mock-allowed",
-    }
+    # ADR-0003: the decision belongs to the policy layer, not to the transport layer.
+    # ADR-0006: the provisioning profile applies the device's bootstrap policy
+    # (limits recorded at registration), returning stable reason codes.
+    decision = attest_device_proof(proof)
 
     return {
         "status": "ok",

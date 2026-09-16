@@ -27,7 +27,76 @@ def test_attest_bad_device_id():
     assert "does not match" in detail["error"]
 
 
-def test_oracle_attest_invalid_missing_field():
+def test_provisioning_attest_returns_a_real_decision():
+    """ADR-0003/0006 (audit 2026-09-16): ``/provisioning/attest`` must DECIDE.
+
+    Regression: the endpoint answered a hardcoded ``{"allowed": true, "reason":
+    "mock-allowed"}`` for every registered device, although the repository presents
+    the policy layer as the single decision point.
+    """
+    key, device_id = make_registered_device(client)
+    proof = build_signed_proof(key, device_id, "nonce-0001", now_iso8601_z(), 2.5)
+    resp = client.post("/provisioning/attest", json=proof)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["device_id"] == device_id
+    assert body["decision"]["allowed"] is True
+    assert body["decision"]["reason"] == "ok"
+    assert "mock-allowed" not in resp.text
+
+
+def test_provisioning_attest_denies_power_above_the_bootstrap_policy():
+    """Registration records ``bootstrap_policy = {"allowed": True, "max_power_kw": 3.5}``."""
+    key, device_id = make_registered_device(client)
+    proof = build_signed_proof(key, device_id, "nonce-0002", now_iso8601_z(), 9.0)
+    decision = client.post("/provisioning/attest", json=proof).json()["decision"]
+    assert decision["allowed"] is False
+    assert decision["reason"] == "max_power_exceeded"
+    assert decision["limit_kw"] == 3.5
+    assert decision["max_power_kw"] == 9.0
+
+
+def test_provisioning_attest_denies_a_disabled_bootstrap_policy():
+    from axis_core.storage.factory import get_backend
+    from axis_core.storage.models import RegisteredDevice
+
+    get_backend().put_device(
+        RegisteredDevice(
+            device_id="dev_1111111111111111",
+            public_key="unused-in-this-path",
+            manifest_ref="manifest:test",
+            bootstrap_policy={"allowed": False},
+        )
+    )
+    proof = {
+        "schema_version": "1.0",
+        "device_id": "dev_1111111111111111",
+        "nonce": "abcdefgh",
+        "timestamp": now_iso8601_z(),
+        "algo": "mock",
+        "payload": {"max_power_kw": 1.0},
+        "signature": "a" * 64,
+    }
+    decision = client.post("/provisioning/attest", json=proof).json()["decision"]
+    assert decision["allowed"] is False
+    assert decision["reason"] == "not_allowed_by_bootstrap_policy"
+
+
+def test_provisioning_attest_unknown_device_is_400():
+    proof = {
+        "schema_version": "1.0",
+        "device_id": "dev_0000000000000000",
+        "nonce": "abcdefgh",
+        "timestamp": now_iso8601_z(),
+        "algo": "mock",
+        "payload": {"max_power_kw": 1.0},
+        "signature": "a" * 64,
+    }
+    resp = client.post("/provisioning/attest", json=proof)
+    assert resp.status_code == 400
+    assert resp.json()["detail"]["message"] == "Invalid DeviceProof"
+
     att = {
         # "attestation_id" missing
         "device_id": "dev_9e9c644e1580a83b",

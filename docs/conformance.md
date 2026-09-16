@@ -99,12 +99,28 @@ Protocol-level platform documents describe `/identity/register`, `/identity/clai
 `/identity/status`. The reference implementation exposes
 `/provisioning/register` and `/provisioning/attest` (see `API.md`).
 
-### 2.6. Policy engine (mock rules) and signature verification
+### 2.6. Policy engine and signature verification
 
-`POST /oracle/attest` now **verifies real Ed25519 device signatures** (spec
-section 12, ADR-0001/ADR-0003). The remaining simplification is the **policy
-engine**: allow/deny is based on `max_power_kw` thresholds only (a mock policy
-engine); richer policies are future work.
+`POST /oracle/attest` **verifies real Ed25519 device signatures** (spec section 12,
+ADR-0001/ADR-0003) and runs the **Policy Engine**
+(`axis_core.policy.PolicyEngine`, the mirror of the ENRG on-chain engine) followed
+by the provisioning-profile domain policy (ADR-0006) — max/min `max_power_kw`.
+
+`POST /provisioning/attest` no longer answers a hardcoded
+`{"allowed": true, "reason": "mock-allowed"}` (removed 2026-09-16): it applies the
+**device's `bootstrap_policy`** recorded at registration and returns stable reason
+codes (`ok`, `max_power_exceeded`, `below_minimum_power`,
+`not_allowed_by_bootstrap_policy`, `invalid_max_power_kw`).
+
+Remaining simplifications in this repository (documented, not silent):
+
+- the L1 registry models a **simplified lifecycle** (§2.3), so the decision inputs
+  available here are a subset of the on-chain ones (no device tiers, no rolling
+  energy window, no reputation): the provisioning-profile policy parameters cover
+  power limits only;
+- `POST /provisioning/attest` does **not** verify the device signature — that is the
+  Verifier's job on the oracle path; the provisioning endpoint is a registry-side
+  policy check (schema-validated proof + a registered device).
 
 The `mock` algorithm is accepted only when the `AXIS_ALLOW_MOCK` environment
 variable is set (`1`/`true`/`yes`) — a documented dev-only mode. By default the

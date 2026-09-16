@@ -88,10 +88,22 @@ a simple decision. If the device is not registered, the request is rejected.
   "device_id": "dev_9e9c644e1580a83b",
   "decision": {
     "allowed": true,
-    "reason": "mock-allowed"
+    "reason": "ok",
+    "max_power_kw": 2.5
   }
 }
 ```
+
+The `decision` object is produced by the **policy layer**, not by the transport
+layer (ADR-0003). For the provisioning profile the applicable policy is the device's
+`bootstrap_policy`, recorded at registration (ADR-0006); when it is absent the
+reference limits apply (5 kW max, 0.1 kW min for the dev-only `mock` algo).
+
+Stable reason codes: `ok`, `max_power_exceeded`, `below_minimum_power`,
+`not_allowed_by_bootstrap_policy`, `invalid_max_power_kw`. A denial returns HTTP 200
+with `allowed: false` — the request was processed, the proof was not admitted. An
+unknown device is still rejected with 400 (it is not a policy decision: there is no
+entity to decide about).
 
 **Error (400):** invalid `DeviceProof` or device not registered.
 
