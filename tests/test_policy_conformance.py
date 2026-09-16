@@ -84,7 +84,9 @@ def _report(raw: Dict[str, Any]) -> OracleReport:
     return OracleReport(
         device_id=DEVICE_ID,
         nonce=1,
-        device_timestamp=r["verified_at"],
+        # The device clock is a separate input since the 2026-09-16 hardening; a
+        # vector that omits it means "the device clock agrees with the oracle".
+        device_timestamp=int(r.get("device_timestamp", r["verified_at"])),
         verified_at=r["verified_at"],
         energy_wh=r["energy_wh"],
     )
