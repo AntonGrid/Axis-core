@@ -51,6 +51,15 @@ standard test run (`pytest -q`). They verify:
    guarantees: deterministic serialization, signature over the entire
    envelope, tamper detection, structural validation.
 
+9. **Policy conformance against the on-chain engine.** `tests/test_policy_conformance.py`
+   runs this repository's `PolicyEngine` against the SHARED vector file
+   `ENRG/tests/conformance/policy_vectors.json` — the same file the deployed Rust
+   engine is asserted against by `programs/enrg-mvp/tests/policy_conformance.rs`
+   (18 vectors: preamble gates, reward rules, boundary cases). The vectors are
+   located through `AXIS_CONFORMANCE_VECTORS` or a sibling `ENRG` checkout; when the
+   file is absent the suite skips with an explicit message. `tests/test_policy_engine.py`
+   remains as the local, self-contained check of the same rules.
+
 ---
 
 ## 2. Known deviations and gaps

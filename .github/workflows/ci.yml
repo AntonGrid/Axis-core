@@ -21,7 +21,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check out the shared conformance vectors (ENRG)
+        # The policy vectors live in the ENRG repository — it hosts the on-chain
+        # engine the reference implementation claims to mirror. Public repo, so the
+        # default token can read it. Without this step the conformance test skips.
+        uses: actions/checkout@v4
+        with:
+          repository: AntonGrid/ENRG
+          path: ENRG
+          sparse-checkout: tests/conformance
+
       - name: Run tests
+        env:
+          AXIS_CONFORMANCE_VECTORS: ${{ github.workspace }}/ENRG/tests/conformance/policy_vectors.json
         run: pytest -q
 
   node-registry:
