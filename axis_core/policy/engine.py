@@ -224,6 +224,73 @@ class PolicyEngine:
 
         return PolicyDecision.allowed_ok()
 
+    # ── Collusion signals (Statement #87, ENRG-AI): off-chain extension ──────
+
+    @staticmethod
+    def evaluate_sterility(
+        *,
+        policy: Optional[PolicyRegistry],
+        signal: Any,
+        a2_threshold: Optional[float] = None,
+        cv_threshold: Optional[float] = None,
+    ) -> PolicyDecision:
+        """Decide whether the sterility index rejects (blocks) the mint.
+
+        Off-chain, **opt-in** gate (``enforce_sterility``), disabled by default
+        so minting is unchanged until an operator/DAO turns it on. Statement
+        #87 of the book: a memory relief that matches ``R₀·e^(−εt)`` *too*
+        closely is the signature of synthetic collusion, not of a lived medium.
+
+        ``signal`` only needs ``a2`` (Anderson–Darling) and ``cv`` (coefficient
+        of variation of the relief) — duck typing, so the engine does not
+        depend on ``agent.physics``. The thresholds belong to the policy, not
+        to the signal: a signal that also carries ``synthetic_collusion`` is
+        not trusted more than its numbers. A missing signal (``None``) cannot
+        support a rejection — nothing observed, nothing refused.
+
+        Returns:
+            ``allowed=False`` with
+            ``reason="synthetic_collusion_detected"`` when the policy opted in
+            and ``a2 < a2_threshold`` or ``cv < cv_threshold`` (defaults:
+            ``policy.sterility_a2_threshold`` / ``policy.sterility_cv_threshold``).
+        """
+        if not (policy.enforce_sterility if policy else False):
+            return PolicyDecision.allowed_ok()
+
+        a2 = getattr(signal, "a2", None)
+        cv = getattr(signal, "cv", None)
+        if a2 is None or cv is None:
+            return PolicyDecision.allowed_ok()
+
+        a2_limit = (
+            a2_threshold
+            if a2_threshold is not None
+            else (policy.sterility_a2_threshold if policy else 0.1)
+        )
+        cv_limit = (
+            cv_threshold
+            if cv_threshold is not None
+            else (policy.sterility_cv_threshold if policy else 0.005)
+        )
+
+        a2, cv = float(a2), float(cv)
+        if a2 < a2_limit or cv < cv_limit:
+            return PolicyDecision(
+                allowed=False,
+                reason="synthetic_collusion_detected",
+                details={
+                    "sterility_a2": a2,
+                    "sterility_cv": cv,
+                    "sterility_a2_threshold": a2_limit,
+                    "sterility_cv_threshold": cv_limit,
+                    "sterility_verdict": getattr(signal, "details", {}).get(
+                        "verdict", "failed"
+                    ),
+                },
+            )
+
+        return PolicyDecision.allowed_ok()
+
     # ── Market gate (Phase 3, ENRG-AI): recommendation → authorized action ──
 
     @staticmethod

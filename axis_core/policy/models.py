@@ -136,6 +136,18 @@ class PolicyRegistry:
     enforce_ai_anomaly: bool = False
     #: Minimum ``Signal.score`` for an AI anomaly to reject the report.
     ai_anomaly_threshold: float = 0.6
+    #: Off-chain collusion switch (Phase 1, ENRG-AI, Statement #87). When
+    #: enabled the oracle rejects a report whose memory relief is *too* close
+    #: to ``R₀·e^(−εt)`` — the sterility index says so. NOT mirrored on-chain:
+    #: an operator/DAO-level extension, off until turned on.
+    enforce_sterility: bool = False
+    #: Anderson–Darling ``A²`` below this value means "unnaturally exact": the
+    #: residuals carry no noise, which is what a formula looks like, not a
+    #: medium. Default 0.1 — the threshold named in the book's Statement #87.
+    sterility_a2_threshold: float = 0.1
+    #: ``CV(relief)`` below this value is below the physical floor the written
+    #: 1 % miss puts under the record. Default 0.005.
+    sterility_cv_threshold: float = 0.005
     #: Off-chain market gate (Phase 3): enforce per-device trade limits.
     enforce_trade_limits: bool = False
     #: Maximum trade volume (Wh) per action; 0 means "no limit".

@@ -410,6 +410,139 @@ def test_load_policy_sanitizes_ai_threshold():
         load_policy_config(env={"AXIS_POLICY_AI_ANOMALY_THRESHOLD": "abc"})
 
 
+# ── Statement #87 (sterility index, ENRG-AI): opt-in off-chain gate ─────────
+
+
+def _fake_sterility(a2: float, cv: float, verdict: str = "passed"):
+    """A minimal duck-typed Statement #87 reading.
+
+    The engine must not depend on ``agent.physics``: anything with ``a2``, ``cv``
+    and ``details`` is a signal, exactly as ``_fake_signal`` stands in for the AI
+    anomaly.
+    """
+
+    return type(
+        "_Sterility",
+        (),
+        {"a2": a2, "cv": cv, "details": {"verdict": verdict}},
+    )()
+
+
+def test_sterility_disabled_by_default_allows():
+    policy = _default_policy()  # enforce_sterility defaults to False
+    decision = PolicyEngine.evaluate_sterility(
+        policy=policy, signal=_fake_sterility(a2=0.0, cv=0.0, verdict="failed")
+    )
+    assert decision.allowed is True
+    assert decision.reason == "ok"
+
+
+def test_sterility_none_policy_allows():
+    decision = PolicyEngine.evaluate_sterility(
+        policy=None, signal=_fake_sterility(a2=0.0, cv=0.0, verdict="failed")
+    )
+    assert decision.allowed is True
+
+
+def test_sterility_blocks_unnaturally_exact_relief():
+    policy = _default_policy()
+    policy.enforce_sterility = True
+    decision = PolicyEngine.evaluate_sterility(
+        policy=policy, signal=_fake_sterility(a2=0.0, cv=0.175, verdict="failed")
+    )
+    assert decision.allowed is False
+    assert decision.reason == "synthetic_collusion_detected"
+    assert decision.details["sterility_a2"] == 0.0
+    assert decision.details["sterility_cv"] == 0.175
+    assert decision.details["sterility_a2_threshold"] == 0.1
+    assert decision.details["sterility_cv_threshold"] == 0.005
+    assert decision.details["sterility_verdict"] == "failed"
+
+
+def test_sterility_blocks_flat_relief_through_the_variation_floor():
+    policy = _default_policy()
+    policy.enforce_sterility = True
+    decision = PolicyEngine.evaluate_sterility(
+        policy=policy, signal=_fake_sterility(a2=2.0, cv=0.001, verdict="failed")
+    )
+    assert decision.allowed is False
+    assert decision.reason == "synthetic_collusion_detected"
+
+
+def test_sterility_passes_lived_relief():
+    policy = _default_policy()
+    policy.enforce_sterility = True
+    # Numbers a lived medium produces (consistency.jl, seed 1: A² = 8.20, CV = 0.175).
+    decision = PolicyEngine.evaluate_sterility(
+        policy=policy, signal=_fake_sterility(a2=8.204, cv=0.175, verdict="passed")
+    )
+    assert decision.allowed is True
+    assert decision.reason == "ok"
+
+
+def test_sterility_missing_signal_is_not_a_rejection():
+    policy = _default_policy()
+    policy.enforce_sterility = True
+    decision = PolicyEngine.evaluate_sterility(policy=policy, signal=None)
+    assert decision.allowed is True
+
+
+def test_sterility_thresholds_are_policy_not_signal():
+    policy = _default_policy()
+    policy.enforce_sterility = True
+    # The same reading passes or fails depending on the policy alone.
+    signal = _fake_sterility(a2=0.3, cv=0.2, verdict="passed")
+    assert PolicyEngine.evaluate_sterility(policy=policy, signal=signal).allowed is True
+
+    policy.sterility_a2_threshold = 0.5
+    decision = PolicyEngine.evaluate_sterility(policy=policy, signal=signal)
+    assert decision.allowed is False
+    assert decision.reason == "synthetic_collusion_detected"
+
+
+def test_sterility_explicit_threshold_override():
+    policy = _default_policy()
+    policy.enforce_sterility = True
+    passed = PolicyEngine.evaluate_sterility(
+        policy=policy,
+        signal=_fake_sterility(a2=0.3, cv=0.2),
+        a2_threshold=0.2,
+        cv_threshold=0.1,
+    )
+    assert passed.allowed is True
+
+    blocked = PolicyEngine.evaluate_sterility(
+        policy=policy,
+        signal=_fake_sterility(a2=0.3, cv=0.2),
+        cv_threshold=0.25,
+    )
+    assert blocked.allowed is False
+
+
+def test_load_policy_sterility_env_overrides():
+    policy = load_policy_config(
+        env={
+            "AXIS_POLICY_ENFORCE_STERILITY": "true",
+            "AXIS_POLICY_STERILITY_A2_THRESHOLD": "0.25",
+            "AXIS_POLICY_STERILITY_CV_THRESHOLD": "0.01",
+        }
+    )
+    assert policy.enforce_sterility is True
+    assert policy.sterility_a2_threshold == 0.25
+    assert policy.sterility_cv_threshold == 0.01
+
+
+def test_load_policy_sanitizes_sterility_parameters():
+    import pytest
+
+    with pytest.raises(ValueError):
+        load_policy_config(env={"AXIS_POLICY_STERILITY_A2_THRESHOLD": "-1"})
+    with pytest.raises(ValueError):
+        load_policy_config(env={"AXIS_POLICY_STERILITY_CV_THRESHOLD": "0"})
+    with pytest.raises(ValueError):
+        load_policy_config(env={"AXIS_POLICY_STERILITY_CV_THRESHOLD": "abc"})
+
+
 # ── Market trade gate (Phase 3): recommendation → authorized action ─────────
 
 

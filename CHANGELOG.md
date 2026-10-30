@@ -34,8 +34,17 @@ The format follows the principles of Keep a Changelog.
 - **`POST /market/recommend`** — end-to-end API: Recommender → Policy Engine
   → authoritative `trade_decision`.
 - **Premium SELL rule** — the Recommender sells stored energy when the price
-  clears the rolling average (`sell_premium`, `min_sell_storage_ratio`);
+  clears the rolling average (`sell_premium`, `min_sell_storage_ratio`); this
   closes the arbitrage loop used by the DePIN pilot.
+- **Sterility gate (Statement #87, ENRG-AI)** — new `PolicyRegistry`
+  parameters `enforce_sterility` / `sterility_a2_threshold` (0.1) /
+  `sterility_cv_threshold` (0.005), off-chain and opt-in, and
+  `PolicyEngine.evaluate_sterility` with the stable
+  `synthetic_collusion_detected` reason. The oracle blocks a mint when a
+  report carries a relief reading (`payload.sterility`) whose Anderson–Darling
+  `A²` or `CV(relief)` falls below the policy floor; the thresholds belong to
+  the policy, not to the signal, and a missing signal never blocks.
+  Documented in `docs/policy-engine.md`.
 
 - Oracle now verifies real Ed25519 device signatures (`POST /oracle/attest`).
 - Canonical signed-message format and Base64 key/signature encoding

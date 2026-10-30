@@ -45,6 +45,9 @@ DEFAULT_POLICY = PolicyRegistry(
     enforce_supply_cap=True,
     enforce_ai_anomaly=False,
     ai_anomaly_threshold=0.6,
+    enforce_sterility=False,
+    sterility_a2_threshold=0.1,
+    sterility_cv_threshold=0.005,
     enforce_trade_limits=False,
     trade_max_volume_wh=0,
     trade_requires_dao=False,
@@ -62,6 +65,7 @@ _BOOL_ENV = {
     "enforce_energy_caps": "AXIS_POLICY_ENFORCE_ENERGY_CAPS",
     "enforce_supply_cap": "AXIS_POLICY_ENFORCE_SUPPLY_CAP",
     "enforce_ai_anomaly": "AXIS_POLICY_ENFORCE_AI_ANOMALY",
+    "enforce_sterility": "AXIS_POLICY_ENFORCE_STERILITY",
     "enforce_trade_limits": "AXIS_POLICY_ENFORCE_TRADE_LIMITS",
     "trade_requires_dao": "AXIS_POLICY_TRADE_REQUIRES_DAO",
 }
@@ -72,6 +76,8 @@ _INT_ENV = {
 }
 _FLOAT_ENV = {
     "ai_anomaly_threshold": "AXIS_POLICY_AI_ANOMALY_THRESHOLD",
+    "sterility_a2_threshold": "AXIS_POLICY_STERILITY_A2_THRESHOLD",
+    "sterility_cv_threshold": "AXIS_POLICY_STERILITY_CV_THRESHOLD",
 }
 
 
@@ -124,6 +130,10 @@ def load_policy_config(
         raise ValueError("max_clock_skew_sec must be in [0, 3600]")
     if not (0 <= policy.ai_anomaly_threshold <= 1.0):
         raise ValueError("ai_anomaly_threshold must be in [0.0, 1.0]")
+    if policy.sterility_a2_threshold < 0:
+        raise ValueError("sterility_a2_threshold must be >= 0")
+    if not (0 < policy.sterility_cv_threshold <= 1.0):
+        raise ValueError("sterility_cv_threshold must be in (0.0, 1.0]")
     if policy.trade_max_volume_wh < 0:
         raise ValueError("trade_max_volume_wh must be >= 0")
 

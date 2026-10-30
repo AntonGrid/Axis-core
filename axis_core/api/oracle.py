@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -207,6 +208,19 @@ def _policy_config() -> PolicyRegistry:
     return load_policy_config()
 
 
+def _sterility_signal(payload: Dict[str, Any]) -> SimpleNamespace:
+    """Statement #87's reading, shaped for ``PolicyEngine.evaluate_sterility``.
+
+    The engine duck-types ``a2`` and ``cv``; everything else the payload carries
+    (``verdict``, ``r0``, ``points``...) travels in ``details`` untouched, so a
+    decision can quote the reading back without the engine knowing this layer.
+    A payload without either number yields ``None``, and the gate then has
+    nothing to refuse on.
+    """
+    details = {k: v for k, v in payload.items() if k not in {"a2", "cv"}}
+    return SimpleNamespace(a2=payload.get("a2"), cv=payload.get("cv"), details=details)
+
+
 def _ai_history(request: Dict[str, Any]) -> list:
     """Chronological history for the AI anomaly signal.
 
@@ -350,6 +364,20 @@ def _resolve_decision(request: Dict[str, Any]) -> Dict[str, Any]:
         ai_decision = PolicyEngine.evaluate_ai_anomaly(policy=policy, signal=signal)
         if not ai_decision.allowed:
             return _decision(False, ai_decision.reason, 0.0)
+
+    # ── Collusion signal (Statement #87, ENRG-AI): opt-in off-chain gate ─────
+    # The physics layer reads the sterility index off a device's relief trace
+    # and ships it in the request payload as {"a2": ..., "cv": ...}. Nothing
+    # runs unless an operator/DAO enabled ``enforce_sterility``; the gate then
+    # blocks the mint with the stable ``synthetic_collusion_detected`` reason.
+    if policy.enforce_sterility:
+        sterility = (request.get("payload") or {}).get("sterility")
+        if isinstance(sterility, dict):
+            sterility_decision = PolicyEngine.evaluate_sterility(
+                policy=policy, signal=_sterility_signal(sterility)
+            )
+            if not sterility_decision.allowed:
+                return _decision(False, sterility_decision.reason, 0.0)
 
     # ── Domain policy (provisioning profile, ADR-0006): power limit ──────────
     if max_power_kw > 5.0:
