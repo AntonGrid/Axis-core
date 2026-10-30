@@ -52,14 +52,23 @@ def build_signed_proof(
     timestamp: str,
     max_power_kw: float,
     algo: str = "ed25519",
+    extra_payload: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Build a proof body signed by ``key`` over the canonical message."""
+    """Build a proof body signed by ``key`` over the canonical message.
+
+    ``extra_payload`` carries readings that ride outside the protocol envelope
+    (e.g. Statement #87's ``sterility``); the signature covers them because it
+    is computed over the whole body.
+    """
+    payload: Dict[str, Any] = {"max_power_kw": max_power_kw}
+    if extra_payload:
+        payload.update(extra_payload)
     body: Dict[str, Any] = {
         "device_id": device_id,
         "nonce": nonce,
         "timestamp": timestamp,
         "algo": algo,
-        "payload": {"max_power_kw": max_power_kw},
+        "payload": payload,
     }
     body["signature"] = sign_proof(key, body)
     return body
